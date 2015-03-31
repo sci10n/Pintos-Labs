@@ -1,32 +1,34 @@
 #ifndef _MAP_H_
 #define _MAP_H_
 #include <stdbool.h>
-#include "filesys/file.h"
-typedef struct file* value_t;
 #include <stdlib.h>
+#include "filesys/file.h"
+#include "filesys/filesys.h"
+typedef struct file* value_t;
 typedef int key_t;
-typedef int mid_t;
+//typedef int mid_t;
 
-#define MAP_SIZE 128
+#define MAP_SIZE 32
 
 struct map
 {
   value_t content[MAP_SIZE];
 };
+/*
 struct maps
 {
   mid_t id;
-  struct map * map;
-  struct maps* next;
+  struct map *map;
+  struct maps* next = NULL;
 };
 //Functions for maps
-//void maps_init(struct maps* m, mid_t id);
-key_t maps_insert(struct maps * m, value_t t, mid_t id);
-value_t maps_find(struct maps * m, key_t k, mid_t id);
+key_t maps_insert(struct maps ** m, value_t t, mid_t id);
+value_t maps_find(struct maps * m, key_t, mid_t id);
 value_t maps_remove(struct maps * m, key_t k, mid_t id);
 void maps_remove_all(struct maps * m, mid_t id);
 //Extra
 void maps_delete(struct maps *m, mid_t id);
+*/
 //Functions for map
 void map_init(struct map* m);
 key_t map_insert(struct map* m, value_t k);
@@ -34,6 +36,11 @@ value_t map_find(struct map* m, key_t k);
 value_t map_remove(struct map*m, key_t k);
 void map_for_each(struct map*m, void(*exec)(key_t k, value_t v, int aux), int aux);
 void map_remove_if(struct map* m, bool (*cond)(key_t k, value_t v, int aux), int aux);
+
+void map_close_file(struct map* m, key_t k);
+void map_close_all_files(struct map * m);
+//Please note that all indexes (FD) needs to be offset by 2 to accomodate screen and keyboard
+
 
 /* Place functions to handle a process open files here (file list).
    

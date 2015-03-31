@@ -12,10 +12,10 @@
 #include "threads/init.h"
 #include "userprog/pagedir.h"
 #include "userprog/process.h"
+#include "userprog/flist.h"
 #include "devices/input.h"
 
 static void syscall_handler (struct intr_frame *);
-
 void
 syscall_init (void) 
 {
@@ -51,54 +51,145 @@ syscall_handler (struct intr_frame *f)
   switch ( esp[0] /* retrive syscall number */ )
     {
     case SYS_HALT:
-      printf("LOG [DEBUG]: in SYS_HALT\n");
+      // printf("LOG [DEBUG]: in SYS_HALT\n");
       power_off();
       break;
     case SYS_EXIT:
-      printf("LOG [DEBUG]: in SYS_EXIT\n");
-      printf("LOG [DEBIG]: argument: %i\n",esp[1]);
+      // printf("LOG [DEBUG]: in SYS_EXIT\n");
+      // printf("LOG [DEBIG]: argument: %i\n",esp[1]);
       thread_exit();
       break;
     case SYS_READ:
       {
 	//printf("LOG [DEBUG]: in SYS_READ\n");
-	char *buff = (char*)esp[2];
-	if(esp[1] != STDIN_FILENO)
+	int fd = esp[1];
+	char *buffer = (char*)esp[2];
+	int size = esp[3];
+	if(fd == STDOUT_FILENO || fd == -1)
 	  {
-	    // printf("LOG [DEBUG]: not STDIN_FILENO in read\n");
 	    f->eax = -1;
 	    break;
 	  }
-	int counter = 0;
-	while(counter < esp[3])
+	
+	else if(fd == STDIN_FILENO)
 	  {
-	    char c = input_getc();
-	    if(c == '\r')
-	      c = '\n';
-	    *(buff + counter) = c;
-	    putbuf((char*)&c,1);
-	    counter++;
+	    int counter = 0;
+	    while(counter < size)
+	      {
+		char c = input_getc();
+		if(c == '\r')
+		  c = '\n';
+		*(buffer + counter) = c;
+		putbuf((char*)&c,1);
+		counter++;
+	      }
+	    f->eax = counter;
 	  }
-	f->eax = counter;
-	//printf("LOG [DEBUG]: buffer: %s \n", buff);
+	else
+	  {
+	    struct file * file = map_find(&(thread_current()->open_file_table), fd);
+	    if(file == NULL)
+	      {
+		f->eax = -1;
+		break;
+	      }
+	    f->eax  = file_read(file, buffer, size);
+	  }
       }
       break;
     case SYS_WRITE:
       {
-	//printf("LOG [DEBUG]: in SYS_WRITE\n");
-	if(esp[1] != STDOUT_FILENO)
+	int fd = esp[1];
+	char * buffer = (char*) esp[2];
+	int size = esp[3];
+	if(fd == STDIN_FILENO || fd == -1)
 	  {
-	    // printf("LOG [DEBUG]: not STDOUT_FILENO in write\n");
 	    f->eax = -1;
 	    break;
 	  }
-	putbuf((char*)esp[2], esp[3]);
-	f->eax = esp[3];
+	else if(fd == STDOUT_FILENO)
+	  {
+	    putbuf(buffer, size);
+	    f->eax = size;
+	  }
+	else
+	  {
+	    struct file * file = map_find(&(thread_current()->open_file_table), fd);
+	    if(file == NULL)
+	      {
+		f->eax = -1;
+		break;
+	      }
+	    f->eax = file_write(file, buffer,size);
+	  }
       }
       break;
     case SYS_OPEN:
       {
+	//	printf("Opend a file\n");
 	char* file = (char*)esp[1];
+	int fd = map_insert(&(thread_current()->open_file_table), filesys_open(file));
+	f->eax = fd; 
+      }
+      break;
+    case SYS_CREATE:
+      {
+	//	printf("Created a file\n");
+	char * file = (char*) esp[1];
+	unsigned int size = esp[2];
+	f->eax = filesys_create(file,size);
+	break;
+      }
+    case SYS_REMOVE:
+      {
+      //printf("Removing a file\n");
+      char * file = (char*) esp[1];
+      f->eax = filesys_remove(file);
+      
+      break;
+      }
+    case SYS_CLOSE:
+      {
+      // printf("Closed a file\n");
+      int fd = esp[1];
+      if(fd > 1)
+	map_close_file(&(thread_current()->open_file_table), fd);
+      break;
+      }
+    case SYS_SEEK:
+      {
+	int fd = esp[1];
+	int pos = esp[2];
+	struct file * file = map_find(&(thread_current()->open_file_table), fd);
+	if(file == NULL)
+	  {
+	    break;
+	  }
+	file_seek(file, pos);
+      }
+      break;
+    case SYS_TELL:
+      {
+	int fd = esp[1];
+	struct file * file = map_find(&(thread_current()->open_file_table), fd);
+	if(file == NULL)
+	  {
+	    f->eax = -1;
+	    break;
+	  }
+	f->eax = file_tell(file);
+      }
+      break;
+    case SYS_FILESIZE:
+      {
+	int fd = esp[1];
+	struct file * file = map_find(&(thread_current()->open_file_table), fd);
+	if(file == NULL)
+	  {
+	    f->eax = -1;
+	    break;
+	  }
+	f->eax = file_length(file);
       }
       break;
     default:

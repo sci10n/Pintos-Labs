@@ -9,9 +9,18 @@
 int
 main (void)
 {
-  char c[10];
-  read(0,c, sizeof c);
-  write(1,c, 6000);
-  halt ();
+  create("xys",128);
+  create("HELLOWORLD",256);
+  int fd1 = open("xys");
+  printf("Result: %i\n", remove("xys"));
+  int fd2 = open("HELLOWORLD");
+  printf("FD:S %i , %i \n", fd1, fd2);
+  close(fd1);
+  fd1 = open("xys");
+  printf("FD:S %i , %i \n", fd1, fd2);
+  close(fd2);
+  
+  close(fd1);
+halt();
   /* not reached */
 }

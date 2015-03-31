@@ -4,7 +4,6 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-
 #include "userprog/flist.h"
 
 /* States in a thread's life cycle. */
@@ -95,7 +94,8 @@ struct thread
     struct list_elem elem;              /* List element. */
 
     /* YES! You may want to add stuff. But make note of point 2 above. */
-
+    //add per process open file table
+    struct map open_file_table;
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */

@@ -115,6 +115,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
   /* YES! You may want add stuff here. */
+  map_init(&(t->open_file_table));
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -317,6 +318,7 @@ thread_exit (void)
   /* Just set our status to dying and schedule another process.
      We will be destroyed during the call to schedule_tail(). */
   intr_disable ();
+  map_close_all_files(&(thread_current()->open_file_table));
   thread_current ()->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
