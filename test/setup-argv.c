@@ -303,7 +303,7 @@ int main()
   
   /* put initial content on our simulated stack */
   esp = setup_main_stack(line, simulated_stack_top);
-  printf("# esp = address_of_null[i-1]\n", (unsigned)esp);
+  printf("# esp = %08x\n", (unsigned)esp);
   
   /* dump memory area for verification */
   dump(esp, (unsigned)simulated_stack_top - (unsigned)esp);

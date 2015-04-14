@@ -10,7 +10,7 @@ tid_t process_execute (const char *file_name);
 int process_wait (tid_t);
 void process_cleanup (void);
 void process_activate (void);
-
+void* createStack(const char*, void*);
 /* This is unacceptable solutions. */
 #define INFINITE_WAIT() for ( ; ; ) thread_yield()
 #define BUSY_WAIT(n)       \

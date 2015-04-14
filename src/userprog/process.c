@@ -24,6 +24,35 @@
 /* HACK defines code you must remove and implement in a proper way */
 #define HACK
 
+/* void dump_stack(void* ptr, int size)
+{
+  int i;
+  
+  printf("Adress  \thex-data \tchar-data\n");
+  
+  for (i = size - 1; i >= 0; --i)
+  {
+    void** adr = (void**)((unsigned)ptr + i);
+    unsigned char* byte = (unsigned char*)((unsigned)ptr + i);
+
+    printf("%08x\t", (unsigned)ptr + i); /\* address *\/
+      
+    if ((i % 4) == 0)
+      /\* seems we're actually forbidden to read unaligned adresses *\/
+      printf("%08x\t", (unsigned)*adr); /\* content interpreted as address *\/
+    else
+      printf("        \t"); /\* fill *\/
+        
+    if(*byte >= 32 && *byte < 127)
+      printf("%c\n", *byte); /\* content interpreted as character *\/
+    else
+      printf("\\%o\n", *byte);
+    
+    if ((i % 4) == 0)
+      printf("------------------------------------------------\n");
+  }
+}
+
 
 /* This function is called at boot time (threads/init.c) to initialize
  * the process subsystem. */
@@ -135,7 +164,6 @@ start_process (struct parameters_to_start_process* parameters)
         thread_current()->name,
         thread_current()->tid,
         success);
-  
   if (success)
   {
     /* We managed to load the new program to a process, and have
@@ -147,14 +175,14 @@ start_process (struct parameters_to_start_process* parameters)
        "pretend" the arguments are present on the stack. A normal
        C-function expects the stack to contain, in order, the return
        address, the first argument, the second argument etc. */
-    
-    HACK if_.esp -= 12; /* Unacceptable solution. */
+    if_.esp = createStack(parameters->command_line, if_.esp);
+    //HACK if_.esp -= 12; /* Unacceptable solution. */
 
     /* The stack and stack pointer should be setup correct just before
        the process start, so this is the place to dump stack content
        for debug purposes. Disable the dump when it works. */
     
-//    dump_stack ( PHYS_BASE + 15, PHYS_BASE - if_.esp + 16 );
+    dump_stack ( PHYS_BASE + 15, PHYS_BASE - if_.esp + 16 );
 
   }
 
@@ -273,3 +301,111 @@ process_activate (void)
   tss_update ();
 }
 
+void* createStack(const char * command_line, void* stack_top)
+{
+  /* Variable "esp" stores an address, and at the memory loaction
+   * pointed out by that address a "struct main_args" is found.
+   * That is: "esp" is a pointer to "struct main_args" */
+  void* esp;
+  int argc;
+  int total_size;
+  int line_size_nd;
+  int line_size;
+  /* "cmd_line_on_stack" and "ptr_save" are variables that each store
+     * one address, and at that address (the first) char (of a possible
+    * sequence) can be found. */
+  char* cmd_line_on_stack;
+  char* ptr_save;
+  int i = 0;
+  
+  /* calculate the bytes needed to store the command_line */
+  line_size = 0; 
+  char* c = command_line;
+  while(*(c++) != '\0')
+    {
+      line_size++;
+    }
+  /* round up to make it even divisible by 4 */
+  line_size_nd = line_size;
+  line_size += line_size % 4 == 0 ? 0: 4 - line_size % 4;
+  /* calculate how many words the command_line contain */
+  argc = 0;
+  c = command_line; ;
+  char prev = ' ';
+  while(*c != '\0')
+    {
+      
+      if(*c != ' ' && prev == ' ')
+   	argc++;
+      prev = *(c++);
+	
+    }
+  /* calculate the size of each word */
+  int argv_size[argc];
+  int tmp = 0;
+  c = command_line;
+  i = 0;
+  while(i < argc)
+    {
+      if(*c == ' ' || *(c) == '\0')
+	{
+	  if(tmp != 0)
+	    {
+	      argv_size[i++] = tmp;
+	      tmp = 0;
+	    }
+	}
+      else
+	tmp++;
+      c++;
+    }
+  /* calculate the size needed on our simulated stack */
+  total_size = line_size + argc*4 + 16;
+  /* calculate where the final stack top will be located */
+   esp =  stack_top - (total_size);
+  /* setup return address and argument count */
+  //esp->ret = 0;
+  //esp->argc = argc;
+  
+  /* calculate where in the memory the words is stored */
+  cmd_line_on_stack = stack_top - line_size;
+
+  /* calculate where in the memory the argv array starts */
+  //esp->argv = (cmd_line_on_stack - (argc+2)*4);
+
+  /* copy the command_line to where it should be in the stack */
+  int*address_of_null[argc+1];
+  int temp_index = 1;
+  address_of_null[0] = 0;
+  int tmp_ptr = 0;
+  prev = 0;
+  for(i = 0; i<= line_size; i++)
+    {
+      char ch = command_line[ (line_size - i)];
+      if(ch != ' ')
+	tmp_ptr = stack_top -i;
+      if((ch == ' ') && ( line_size - i < line_size_nd))
+	{
+	  ch = '\0';
+	  if(prev != '\0')
+	    address_of_null[temp_index++] = tmp_ptr;
+	}
+      (*(char*)(stack_top-i)) = ch; //might need to filter ' ' or '\0' or '.'
+      prev = ch;
+    }
+  address_of_null[argc] = tmp_ptr;
+
+  /* build argv array and insert null-characters after each word */
+  for(i = 1; i<= argc+1; i++)
+    {
+      *(int*)(cmd_line_on_stack-i*4) = address_of_null[i-1];
+    }
+
+  *(int*)(cmd_line_on_stack - (argc+2)*4) = cmd_line_on_stack - (argc+1)*4;
+
+  *(cmd_line_on_stack - (argc+3)*4) = argc;
+
+  //*(cmd_line_on_stack - (argc+4)*4) = esp->ret;
+  *(cmd_line_on_stack - (argc+4)*4) = 0;
+  return esp; /* the new stack top */
+}

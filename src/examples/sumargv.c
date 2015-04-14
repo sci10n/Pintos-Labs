@@ -50,5 +50,6 @@ main (int argc, char **argv)
 
   /* The final return value should now be the sum of the numbers
    * specified after sumargv on the command line. */
+  printf("Sum %i\n",sum);
   return sum;
 }
