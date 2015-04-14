@@ -32,7 +32,7 @@ bool verify_fix_length(void* start, int length)
 
   for(int i = 0; i < number_of_pages; i++)
     {
-      if(pagedir_get_page(NULL, page_start_address) == NULL)
+      if(pagedir_get_page(thread_current()->pagedir, page_start_address) == NULL)
 	{
 	  return false;
 	}
@@ -54,7 +54,7 @@ bool verify_variable_length(char* start)
   int bytes_used = (void*) start - page_start_address;
   int length = bytes_used;
 
-  if(pagedir_get_page(NULL, page_start_address) == NULL)
+  if(pagedir_get_page(thread_current()->pagedir, page_start_address) == NULL)
     {
       return false;
     }
@@ -66,7 +66,7 @@ bool verify_variable_length(char* start)
       if(length % PGSIZE == 0)
 	{
 	  length = 1;
-	  if(pagedir_get_page(NULL, (const void*) address + 1) == NULL)
+	  if(pagedir_get_page(thread_current()->pagedir, (const void*) address + 1) == NULL)
 	    {
 	      return false;
 	    }
