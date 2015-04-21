@@ -24,11 +24,14 @@
 /* HACK defines code you must remove and implement in a proper way */
 //#define HACK
 
+static struct plist process_id_table;
 
 /* This function is called at boot time (threads/init.c) to initialize
  * the process subsystem. */
 void process_init(void)
 {
+  
+  plist_init(&process_id_table);
   //sema_init()
 }
 
@@ -45,6 +48,7 @@ void process_exit(int status UNUSED)
  * relevant debug information in a clean, readable format. */
 void process_print_list()
 {
+  plist_print(&process_id_table);
 }
 
 
@@ -53,6 +57,7 @@ struct parameters_to_start_process
   char* command_line;
   struct semaphore semaphore_process_id; 
   int process_id;
+  int parent_id;
 };
 
 static void
@@ -74,7 +79,7 @@ process_execute (const char *command_line)
 
   /* LOCAL variable will cease existence when function return! */
   struct parameters_to_start_process arguments;
-
+  arguments.parent_id = thread_current()->tid;
   debug("%s#%d: process_execute(\"%s\") ENTERED\n",
         thread_current()->name,
         thread_current()->tid,
@@ -102,6 +107,7 @@ process_execute (const char *command_line)
       process_id =arguments.process_id;
       if(process_id != -1)
 	{
+	  debug("Returned to process_execute with valid id\n");
 	  //Add to list
 	}
     }
@@ -156,7 +162,15 @@ start_process (struct parameters_to_start_process* parameters)
        allocated memory for a process stack. The stack top is in
        if_.esp, now we must prepare and place the arguments to main on
        the stack. */
-
+	  struct process_info * info = (struct process_info*)malloc(sizeof(struct process_info));
+	  info->free = false;
+	  info->proc_id = thread_current()->tid;
+	  info->parent_id = parameters->parent_id;
+	  info->alive =true;
+	  //MEGA HACK
+	  info->parent_alive = info->parent_id > 2;
+	  plist_insert(&process_id_table, info);
+	  plist_print(&process_id_table);
     /* A temporary solution is to modify the stack pointer to
        "pretend" the arguments are present on the stack. A normal
        C-function expects the stack to contain, in order, the return
@@ -255,7 +269,7 @@ process_cleanup (void)
    * possibly before the prontf is completed.)
    */
   printf("%s: exit(%d)\n", thread_name(), status);
-  
+  plist_remove(&process_id_table, cur->tid,status);
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   if (pd != NULL) 

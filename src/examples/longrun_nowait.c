@@ -48,7 +48,7 @@ int main(int argc, char* argv[])
       );
     return -1;
   }
-
+  printf("\t\t%s\n",argv[2]);
   simul = atoi(argv[1]);
   repeat = atoi(argv[2]);
 
@@ -58,7 +58,7 @@ int main(int argc, char* argv[])
            "simultaneos processes.\n", MAX_SIMULTANEOUS);
     return -1;
   }
-  
+
   if (repeat > MAX_REPEAT)
   {
     printf("This test program is compiled with a limitation to max %d \n"
@@ -78,7 +78,7 @@ int main(int argc, char* argv[])
     
     exec(cmd);
     
-//    plist();
+    plist();
 
     /* since we do not have the wait systemcall yet */
     printf("Now entering busy-loop to let some processes finish\n");

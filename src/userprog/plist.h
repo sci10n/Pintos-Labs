@@ -5,7 +5,7 @@
 typedef struct process_info* plist_value_t;
 typedef int plist_key_t;
 
-#define PLIST_SIZE 32
+#define PLIST_SIZE 512
 struct process_info
 {
   bool free;
@@ -21,12 +21,19 @@ struct plist
   plist_value_t content[PLIST_SIZE];
 };
 //Functions for plist
+//Init a map
 void plist_init(struct plist* m);
-plist_key_t plist_insert(struct plist* m, plist_value_t k);
+//insert a new process
+plist_key_t plist_(struct plist* m, plist_value_t k);
+//find a specific process entry
 plist_value_t plist_find(struct plist* m, plist_key_t k);
-plist_value_t plist_remove(struct plist*m, plist_key_t k);
+//remove values with  flag free set 
+void plist_remove(struct plist*m, plist_key_t k, int status);
 void plist_for_each(struct plist*m, void(*exec)(plist_key_t k, plist_value_t v, int aux), int aux);
-void plist_remove_if(struct plist* m, bool (*cond)(plist_key_t k, plist_value_t v, int aux), int aux);
+//void plist_remove_if(struct plist* m, bool (*cond)(plist_key_t k, plist_value_t v, int aux), int aux);
+void plist_print(struct plist*m);
+void plist_update(struct plist*m);
+
 /* Place functions to handle a running process here (process list).
    
    plist.h : Your function declarations and documentation.

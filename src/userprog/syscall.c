@@ -142,19 +142,19 @@ syscall_handler (struct intr_frame *f)
       }
     case SYS_REMOVE:
       {
-      //printf("Removing a file\n");
-      char * file = (char*) esp[1];
-      f->eax = filesys_remove(file);
+	//printf("Removing a file\n");
+	char * file = (char*) esp[1];
+	f->eax = filesys_remove(file);
       
-      break;
+	break;
       }
     case SYS_CLOSE:
       {
-      // printf("Closed a file\n");
-      int fd = esp[1];
-      if(fd > 1)
-	map_close_file(&(thread_current()->open_file_table), fd);
-      break;
+	// printf("Closed a file\n");
+	int fd = esp[1];
+	if(fd > 1)
+	  map_close_file(&(thread_current()->open_file_table), fd);
+	break;
       }
     case SYS_SEEK:
       {
@@ -193,13 +193,19 @@ syscall_handler (struct intr_frame *f)
       }
       break;
     case SYS_SLEEP:
-
+      {
+	timer_sleep((int)(esp[1]));
+      }
       break;
     case SYS_PLIST:
-
+      {
+	process_print_list();
+      }      
       break;
     case SYS_EXEC:
-
+      {
+	f->eax = process_execute(esp[1]);
+      }
       break;
     default:
       {
