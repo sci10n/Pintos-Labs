@@ -2,7 +2,6 @@
 #define USERPROG_PROCESS_H
 
 #include "threads/thread.h"
-
 void process_init (void);
 void process_print_list (void);
 void process_exit (int status);
@@ -12,12 +11,12 @@ void process_cleanup (void);
 void process_activate (void);
 void* createStack(const char*, void*);
 /* This is unacceptable solutions. */
-#define INFINITE_WAIT() for ( ; ; ) thread_yield()
+/*#define INFINITE_WAIT() for ( ; ; ) thread_yield()
 #define BUSY_WAIT(n)       \
     do {                   \
       int i = n;           \
       while ( i --> 0 )    \
         thread_yield();    \
     } while ( 0 )
-
+*/
 #endif /* userprog/process.h */

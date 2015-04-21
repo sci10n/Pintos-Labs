@@ -192,6 +192,15 @@ syscall_handler (struct intr_frame *f)
 	f->eax = file_length(file);
       }
       break;
+    case SYS_SLEEP:
+
+      break;
+    case SYS_PLIST:
+
+      break;
+    case SYS_EXEC:
+
+      break;
     default:
       {
 	printf ("Executed an unknown system call!\n");
@@ -201,6 +210,7 @@ syscall_handler (struct intr_frame *f)
       
 	thread_exit ();
       }
+      
     }
   //printf("LOG [DEBUG]: end of syscall_handler\n");
 }

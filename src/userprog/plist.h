@@ -1,7 +1,32 @@
 #ifndef _PLIST_H_
 #define _PLIST_H_
+#include <stdbool.h>
+#include <stdlib.h>
+typedef struct process_info* plist_value_t;
+typedef int plist_key_t;
 
+#define PLIST_SIZE 32
+struct process_info
+{
+  bool free;
+  int proc_id;
+  int parent_id;
+  int exit_status;
+  bool alive;
+  bool parent_alive;
+};
 
+struct plist
+{
+  plist_value_t content[PLIST_SIZE];
+};
+//Functions for plist
+void plist_init(struct plist* m);
+plist_key_t plist_insert(struct plist* m, plist_value_t k);
+plist_value_t plist_find(struct plist* m, plist_key_t k);
+plist_value_t plist_remove(struct plist*m, plist_key_t k);
+void plist_for_each(struct plist*m, void(*exec)(plist_key_t k, plist_value_t v, int aux), int aux);
+void plist_remove_if(struct plist* m, bool (*cond)(plist_key_t k, plist_value_t v, int aux), int aux);
 /* Place functions to handle a running process here (process list).
    
    plist.h : Your function declarations and documentation.

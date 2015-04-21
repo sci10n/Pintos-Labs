@@ -22,42 +22,14 @@
 #include "userprog/plist.h"
 
 /* HACK defines code you must remove and implement in a proper way */
-#define HACK
-
-/* void dump_stack(void* ptr, int size)
-{
-  int i;
-  
-  printf("Adress  \thex-data \tchar-data\n");
-  
-  for (i = size - 1; i >= 0; --i)
-  {
-    void** adr = (void**)((unsigned)ptr + i);
-    unsigned char* byte = (unsigned char*)((unsigned)ptr + i);
-
-    printf("%08x\t", (unsigned)ptr + i); /\* address *\/
-      
-    if ((i % 4) == 0)
-      /\* seems we're actually forbidden to read unaligned adresses *\/
-      printf("%08x\t", (unsigned)*adr); /\* content interpreted as address *\/
-    else
-      printf("        \t"); /\* fill *\/
-        
-    if(*byte >= 32 && *byte < 127)
-      printf("%c\n", *byte); /\* content interpreted as character *\/
-    else
-      printf("\\%o\n", *byte);
-    
-    if ((i % 4) == 0)
-      printf("------------------------------------------------\n");
-  }
-}
+//#define HACK
 
 
 /* This function is called at boot time (threads/init.c) to initialize
  * the process subsystem. */
 void process_init(void)
 {
+  //sema_init()
 }
 
 /* This function is currently never called. As thread_exit does not
@@ -79,6 +51,8 @@ void process_print_list()
 struct parameters_to_start_process
 {
   char* command_line;
+  struct semaphore semaphore_process_id; 
+  int process_id;
 };
 
 static void
@@ -113,15 +87,27 @@ process_execute (const char *command_line)
 
   strlcpy_first_word (debug_name, command_line, 64);
   
+  sema_init(&(arguments.semaphore_process_id), 0);
   /* SCHEDULES function `start_process' to run (LATER) */
   thread_id = thread_create (debug_name, PRI_DEFAULT,
                              (thread_func*)start_process, &arguments);
-
-  process_id = thread_id;
-
+  if(thread_id == -1)
+    {
+    debug("Error in thread create\n");
+    process_id = -1;
+    }  
+  else
+    {
+      sema_down(&(arguments.semaphore_process_id));
+      process_id =arguments.process_id;
+      if(process_id != -1)
+	{
+	  //Add to list
+	}
+    }
   /* AVOID bad stuff by turning off. YOU will fix this! */
-  power_off();
-  
+  //power_off();
+
   
   /* WHICH thread may still be using this right now? */
   free(arguments.command_line);
@@ -170,7 +156,7 @@ start_process (struct parameters_to_start_process* parameters)
        allocated memory for a process stack. The stack top is in
        if_.esp, now we must prepare and place the arguments to main on
        the stack. */
-  
+
     /* A temporary solution is to modify the stack pointer to
        "pretend" the arguments are present on the stack. A normal
        C-function expects the stack to contain, in order, the return
@@ -183,6 +169,8 @@ start_process (struct parameters_to_start_process* parameters)
        for debug purposes. Disable the dump when it works. */
     
     dump_stack ( PHYS_BASE + 15, PHYS_BASE - if_.esp + 16 );
+    parameters->process_id = thread_current()->tid;
+    sema_up(&(parameters->semaphore_process_id));
 
   }
 
@@ -190,8 +178,8 @@ start_process (struct parameters_to_start_process* parameters)
         thread_current()->name,
         thread_current()->tid,
         parameters->command_line);
-  
-  
+
+
   /* If load fail, quit. Load may fail for several reasons.
      Some simple examples:
      - File doeas not exist
@@ -199,9 +187,11 @@ start_process (struct parameters_to_start_process* parameters)
      - Not enough memory
   */
   if ( ! success )
-  {
-    thread_exit ();
-  }
+    {
+      parameters->process_id = -1;
+      sema_up(&(parameters->semaphore_process_id));
+      thread_exit ();
+    }
   
   /* Start the user process by simulating a return from an interrupt,
      implemented by intr_exit (in threads/intr-stubs.S). Because
