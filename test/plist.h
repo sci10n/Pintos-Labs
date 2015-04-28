@@ -31,10 +31,6 @@ typedef int plist_key_t;
    clean, readable format.
      
 */
-/*
- *	info struct, the static variable is used to create new identifiers
- * 	unsigned since process id will be > 0 and (might) overflow in longrun
- */
 struct process_info
 {
      	
@@ -46,12 +42,6 @@ bool alive;
 bool parent_alive;
 };
 
-/*
- *	simple linked list design
- *	insert 	O(n)
- *	delete 	O(n)
- * 	find 	O(n)
- */
 struct process_list
 {
   plist_key_t element_id;
@@ -59,42 +49,26 @@ struct process_list
   process_list * next;
 };
 
-/*
- *	used to create a list_entry
- */
 process_list* plist_allocate_list_entry(plist_value_t v);
 
-/*
- *	used to create a new process_info struct
- */
 plist_value_t plist_form_process_info(int proc_id, int parent_id);
+plist_value_t plist_form_process_info_r(int proc_id, int parent_id);
 
-/*
- *	Will assume the list has been inizialized
- * 	is recursive
- * 	returns new process_id @see process_info
- */
 plist_key_t plist_insert(process_list* list, plist_value_t v);
+plist_key_t plist_insert_r(process_list* list, plist_value_t v);
 
-/*
- *	Finds and returns info corresponding with a identifier
- */
 plist_value_t* plist_find(process_list*list, plist_key_t element_id);
+plist_value_t* plist_find_r(process_list*list, plist_key_t element_id);
 
-/*
- *	Takes a id and marks the entry as dead will not remove entry
- */
 bool plist_remove(process_list*list, plist_key_t process_id, int exit_status);
-void plist_remove_children(process_list*list, int parent_id);
-/*
- *	will remove if parent is dead
- *	If parent dies it wil take all children to it's grave
- */
-void plist_free(process_list**list);
+bool plist_remove_r(process_list*list, plist_key_t process_id, int exit_status);
 
-/*
- *	prints the list
- */
+void plist_remove_children(process_list*list, int parent_id);
+
+void plist_free(process_list*list);
+
 void plist_print_list(process_list * list);
+void plist_print_list_r(process_list * list);
+
 
 #endif

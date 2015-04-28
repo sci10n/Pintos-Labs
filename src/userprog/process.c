@@ -162,7 +162,6 @@ start_process (struct parameters_to_start_process* parameters)
 	 allocated memory for a process stack. The stack top is in
 	 if_.esp, now we must prepare and place the arguments to main on
 	 the stack. */
-      //MEGA HACK
       sema_down(&(process_id_table_lock));
       plist_insert(process_id_table, plist_form_process_info(thread_current()->tid,parameters->parent_id));
       plist_print_list(process_id_table);  
