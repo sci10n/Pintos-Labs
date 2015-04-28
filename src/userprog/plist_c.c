@@ -4,7 +4,7 @@
      process_list* plist_allocate_list_entry(value_t v)
      {   
           static plist_key_t id_generator = 0;
-          process_list * l = new process_list;
+          process_list * l = (process_list*)malloc(sizeof(process_list));
           l->element = v;
           l->next = NULL;
           l->element_id = id_generator++;
@@ -66,9 +66,9 @@
           if(list->element.parent_id == parent_id)
           {
                printf("#found child element to %i\n", parent_id);
-               list->element.alive = false;
+               //list->element.alive = false;
                list->element.parent_alive = false;
-               list->element.free = true;
+               list->element.free = !alive;
                plist_remove_children(list->next, list->element_id);
           }
           return plist_remove_children(list->next, parent_id);

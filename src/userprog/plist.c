@@ -1,98 +1,121 @@
-#include <stddef.h>
 #include "plist.h"
 #include <stdio.h>
-#define offset 0
-void plist_init(struct plist* m)
-{
-  int i;
-  for(i = 0; i < PLIST_SIZE; i++)
-    m->content[i] =NULL;
+#define undefined 0x0FFFFFFF
+process_list* plist_allocate_list_entry(plist_value_t v)
+{   
+  static plist_key_t id_generator = 0;
+  debug("###first in allocate list entry\n");
+  process_list * l = (process_list*)malloc(sizeof(process_list));
+  l->element = v;
+  l->next = NULL;
+  l->element_id = id_generator++;
+  debug("###second in allocate list entry\n");
+  return l;
 }
 
-plist_key_t plist_insert(struct plist* m, plist_value_t v)
+plist_value_t plist_form_process_info(int proc_id,int parent_id)
 {
-  debug("Inserting a id %i\n", v->proc_id);
-  int i = 0;
-  // printf("INSERTING INTO FLE TABLE\n");
-  if(v == NULL)
-    return -1;
-  if(m->content[v->proc_id] == NULL)
+  plist_value_t t;
+  t.alive = true;
+  if(parent_id < 2)
+    t.parent_alive = false;
+  else
+    t.parent_alive = true;
+  t.proc_id = proc_id;
+  t.parent_id = parent_id;
+  t.free = false;
+  t.exit_status = undefined;
+  return t;
+}
+
+plist_value_t* plist_find(process_list*list, plist_key_t element_id)
+{
+  if(list == NULL)
+    return NULL;
+  if(list->element_id == element_id)
+    return &(list->element);
+  return plist_find(list->next, element_id);
+}    
+
+plist_key_t plist_insert(process_list* list, plist_value_t v)
+{    
+  if(list->next == NULL)
     {
-      m->content[v->proc_id] = v;
-       return v->proc_id; 
+      list->next = plist_allocate_list_entry(v);
+      return list->element_id;
     }
-  free(v);
-  return -1;
+  return plist_insert(list->next, v);
 }
 
-plist_value_t plist_find(struct plist* m, plist_key_t k)
+bool plist_remove(process_list*list, plist_key_t element_id, int exit_status)
 {
-  return m->content[k - offset];
-}
-
-void plist_remove(struct plist* m, plist_key_t k, int status)
-{
-  plist_value_t v = m->content[k];
-      debug("Remove process id %i with status %i\n",k,status);
-  if(v == NULL)
+  if(list == NULL)
     {
-      debug("Error while removing %i\n", k);
-      return;
+      return false;
     }
-
- v->exit_status = status;
-  v->alive = false;
-  plist_value_t vp =plist_find(m, v->parent_id); 
-  v->parent_alive = vp == NULL ? false : vp->alive;
-  if(!v->parent_alive)
-      v->free = true;
-  plist_update(m);
-}
-
-void plist_for_each(struct plist* m, void(*exec)(plist_key_t k, plist_value_t v, int aux), int aux)
-{
-  int i = 0;
-  for(; i < PLIST_SIZE; i++)
-    if(plist_find(m,i) != NULL)
-      exec(i, plist_find(m,i), aux);
-}
-/*
-void plist_remove_if(struct plist* m, bool (*cond)(plist_key_t k, plist_value_t v, int aux), int aux)
-{
-  int i = 0;
-  for(; i < PLIST_SIZE; i++)
-    if(plist_find(m,i) != NULL)
-      if(cond(i, plist_find(m,i), aux))
-	plist_remove(m,i);
-}
-*/
-void plist_print(struct plist*m)
-{
-  int i = 0;
-  for(; i < PLIST_SIZE; i++)
+  if(list->element_id == element_id)
     {
-      plist_value_t t = plist_find(m,i);
-      if(t != NULL)
-	debug("List entry: %i \tFree: %i \tProc_id:%i \tParent_id:%i \texit_status:%i \talive:%i \tparent_alive:%i \n",i,t->free,t->proc_id, t->parent_id, t->exit_status, t->alive, t->parent_alive);
+
+      printf("#found element to remove\n");
+      list->element.alive = false;
+      list->element.exit_status = exit_status;
+      list->element.free = !list->element.parent_alive;
+
+      plist_remove_children(list->next,element_id);
+      return true;
     }
+  return plist_remove(list->next, element_id, exit_status);
 }
 
-void plist_update(struct plist*m)
+void plist_remove_children(process_list*list, int parent_id)
 {
-  int i = 0;
-  for(; i < PLIST_SIZE; i++)
+  if(list == NULL)
+    return;
+  if(list->element.parent_id == parent_id)
     {
-      plist_value_t t = plist_find(m,i);
-      if(t != NULL)
+      printf("#found child element to %i\n", parent_id);
+      //list->element.alive = false;
+      list->element.parent_alive = false;
+      list->element.free = !list->element.alive;
+      plist_remove_children(list->next, list->element_id);
+    }
+  return plist_remove_children(list->next, parent_id);
+}
+
+
+void plist_free(process_list** list)
+{    
+  if(!*list)
+    return;
+  process_list* current = *list;
+  if(current && current->element.free)
+    {
+      process_list* tmp = current;
+      current = current->next;
+      free( tmp);
+    }
+  (*list) = current;
+  process_list* prev = NULL;
+  while(current)
+    {
+      if(current->element.free)
 	{
-	  if(t->free)
-	    {
-	      debug("REMOVING INDEX %i FROM PROCESS ID TABLE\n", t->proc_id);
-	      m->content[t->proc_id] = NULL;
-	      free(t);
-	      t = NULL;
-	    }
+	  printf("##FREEING A VALUE FROM LIST\n");
+	  prev->next = current->next;
+	  process_list* tmp = current;
+	  current = current->next;
+	  free(tmp);
+	  continue;
 	}
+      prev = current;
+      current = current->next;
     }
 }
-#include "plist.h"
+
+void plist_print_list(process_list * list)
+{
+  if(list == NULL)
+    return;
+  // printf("list:%i id:%i pid:%i Alive:%i pa:%i es:%i \tf:%i\n",list->element_id, list->element.proc_id, list->element.parent_id, list->element.alive, list->element.parent_alive, list->element.exit_status, list->element.free);
+  plist_print_list(list->next);
+}

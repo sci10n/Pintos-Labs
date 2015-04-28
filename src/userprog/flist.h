@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "threads/synch.h"
 typedef struct file* value_t;
 typedef int key_t;
 //typedef int mid_t;
@@ -13,6 +14,7 @@ typedef int key_t;
 struct map
 {
   value_t content[MAP_SIZE];
+  struct lock lock;
 };
 /*
 struct maps

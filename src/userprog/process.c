@@ -24,14 +24,14 @@
 /* HACK defines code you must remove and implement in a proper way */
 //#define HACK
 
-static struct plist process_id_table;
-
+static struct process_list *process_id_table;
+static struct semaphore process_id_table_lock;
 /* This function is called at boot time (threads/init.c) to initialize
  * the process subsystem. */
 void process_init(void)
 {
-  
-  plist_init(&process_id_table);
+  process_id_table = plist_allocate_list_entry(plist_form_process_info(0,0));
+  sema_init(&process_id_table_lock,1);
   //sema_init()
 }
 
@@ -48,7 +48,7 @@ void process_exit(int status UNUSED)
  * relevant debug information in a clean, readable format. */
 void process_print_list()
 {
-  plist_print(&process_id_table);
+  plist_print_list(process_id_table);
 }
 
 
@@ -116,7 +116,7 @@ process_execute (const char *command_line)
 
   
   /* WHICH thread may still be using this right now? */
-  free(arguments.command_line);
+  // free(arguments.command_line);
 
   debug("%s#%d: process_execute(\"%s\") RETURNS %d\n",
         thread_current()->name,
@@ -157,22 +157,18 @@ start_process (struct parameters_to_start_process* parameters)
         thread_current()->tid,
         success);
   if (success)
-  {
-    /* We managed to load the new program to a process, and have
-       allocated memory for a process stack. The stack top is in
-       if_.esp, now we must prepare and place the arguments to main on
-       the stack. */
-	  struct process_info * info = (struct process_info*)malloc(sizeof(struct process_info));
-	  info->free = false;
-	  info->proc_id = thread_current()->tid;
-	  info->parent_id = parameters->parent_id;
-	  info->alive =true;
-	  //MEGA HACK
-	  info->parent_alive = info->parent_id > 2;
-	  plist_insert(&process_id_table, info);
-	  plist_print(&process_id_table);
-    /* A temporary solution is to modify the stack pointer to
-       "pretend" the arguments are present on the stack. A normal
+    {
+      /* We managed to load the new program to a process, and have
+	 allocated memory for a process stack. The stack top is in
+	 if_.esp, now we must prepare and place the arguments to main on
+	 the stack. */
+      //MEGA HACK
+      sema_down(&(process_id_table_lock));
+      plist_insert(process_id_table, plist_form_process_info(thread_current()->tid,parameters->parent_id));
+      plist_print_list(process_id_table);  
+      sema_up(&(process_id_table_lock));
+      /* A temporary solution is to modify the stack pointer to
+	 "pretend" the arguments are present on the stack. A normal
        C-function expects the stack to contain, in order, the return
        address, the first argument, the second argument etc. */
     if_.esp = createStack(parameters->command_line, if_.esp);
@@ -193,7 +189,6 @@ start_process (struct parameters_to_start_process* parameters)
         thread_current()->tid,
         parameters->command_line);
 
-
   /* If load fail, quit. Load may fail for several reasons.
      Some simple examples:
      - File doeas not exist
@@ -202,11 +197,11 @@ start_process (struct parameters_to_start_process* parameters)
   */
   if ( ! success )
     {
+      debug("#problem with start process\n");
       parameters->process_id = -1;
       sema_up(&(parameters->semaphore_process_id));
       thread_exit ();
     }
-  
   /* Start the user process by simulating a return from an interrupt,
      implemented by intr_exit (in threads/intr-stubs.S). Because
      intr_exit takes all of its arguments on the stack in the form of
@@ -269,8 +264,15 @@ process_cleanup (void)
    * possibly before the prontf is completed.)
    */
   printf("%s: exit(%d)\n", thread_name(), status);
-  plist_remove(&process_id_table, cur->tid,status);
-  /* Destroy the current process's page directory and switch back
+
+  sema_down(&(process_id_table_lock));
+  plist_remove(process_id_table, cur->tid,status);
+  plist_free(process_id_table);
+  sema_up(&(process_id_table_lock));  
+  
+  map_close_all_files(&(thread_current()->open_file_table));
+
+/* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   if (pd != NULL) 
     {
@@ -323,7 +325,7 @@ void* createStack(const char * command_line, void* stack_top)
   int i = 0;
   
   /* calculate the bytes needed to store the command_line */
-  line_size = 0; 
+  line_size = 1; 
   char* c = command_line;
   while(*(c++) != '\0')
     {

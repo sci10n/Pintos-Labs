@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define MAX_SIMULTANEOUS 50
+#define MAX_SIMULTANEOUS 51
 #define MAX_REPEAT 1000
 #define BUF_SIZE 64
 
@@ -48,7 +48,7 @@ int main(int argc, char* argv[])
       );
     return -1;
   }
-  printf("\t\t%s\n",argv[2]);
+  // printf("\t\t%s\n",argv[2]);
   simul = atoi(argv[1]);
   repeat = atoi(argv[2]);
 

@@ -189,7 +189,6 @@ thread_create (const char *name, int priority,
   struct switch_entry_frame *ef;
   struct switch_threads_frame *sf;
   tid_t tid;
-  debug("HELLO WORLD\n");
   /* NO! I do not think there's any reason to modify this function. */
   
   ASSERT (function != NULL);
@@ -322,7 +321,7 @@ thread_exit (void)
   /* Just set our status to dying and schedule another process.
      We will be destroyed during the call to schedule_tail(). */
   intr_disable ();
-  map_close_all_files(&(thread_current()->open_file_table));
+
   thread_current ()->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
