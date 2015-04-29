@@ -96,6 +96,8 @@ struct thread
     /* YES! You may want to add stuff. But make note of point 2 above. */
     //add per process open file table
     struct map open_file_table;
+    //Used as id in plist
+    int element_id;
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */

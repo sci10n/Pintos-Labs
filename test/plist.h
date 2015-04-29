@@ -54,16 +54,17 @@ process_list* plist_allocate_list_entry(plist_value_t v);
 plist_value_t plist_form_process_info(int proc_id, int parent_id);
 plist_value_t plist_form_process_info_r(int proc_id, int parent_id);
 
+//Returns a number to find and remove the element later NOT THE PROCESS ID
 plist_key_t plist_insert(process_list* list, plist_value_t v);
 plist_key_t plist_insert_r(process_list* list, plist_value_t v);
 
 plist_value_t* plist_find(process_list*list, plist_key_t element_id);
 plist_value_t* plist_find_r(process_list*list, plist_key_t element_id);
 
-bool plist_remove(process_list*list, plist_key_t process_id, int exit_status);
-bool plist_remove_r(process_list*list, plist_key_t process_id, int exit_status);
+bool plist_remove(process_list*list, plist_key_t element_id, int exit_status);
+bool plist_remove_r(process_list*list, plist_key_t element_id, int exit_status);
 
-void plist_remove_children(process_list*list, int parent_id);
+void plist_remove_children(process_list*list, int parent_element_id);
 
 void plist_free(process_list*list);
 
