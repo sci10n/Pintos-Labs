@@ -24,13 +24,12 @@
 /* HACK defines code you must remove and implement in a proper way */
 //#define HACK
 
-static struct process_list *process_id_table;
+struct process_list process_id_table;
 /* This function is called at boot time (threads/init.c) to initialize
  * the process subsystem. */
 void process_init(void)
 {
-  init_fatlock();
-  process_id_table = plist_allocate_list_entry(plist_form_process_info(0,0));
+   init_fatlock(&process_id_table);
   //sema_init()
 }
 
@@ -47,7 +46,7 @@ void process_exit(int status UNUSED)
  * relevant debug information in a clean, readable format. */
 void process_print_list()
 {
-  plist_print_list(process_id_table);
+  plist_print_list(&process_id_table);
 }
 
 
@@ -57,8 +56,6 @@ struct parameters_to_start_process
   struct semaphore semaphore_process_id; 
   int process_id;
   int parent_id;
-  int element_id;
-  int parent_element_id;
 };
 
 static void
@@ -79,14 +76,13 @@ process_execute (const char *command_line)
   int  process_id = -1;
 
   /* LOCAL variable will cease existence when function return! */
-  struct parameters_to_start_process arguments;
-  arguments.parent_id = thread_current()->tid;
-  arguments.parent_element_id = thread_current()->element_id;
+
   debug("%s#%d: process_execute(\"%s\") ENTERED\n",
         thread_current()->name,
         thread_current()->tid,
         command_line);
-
+  struct parameters_to_start_process arguments;
+  arguments.parent_id = thread_current()->tid;
   /* COPY command line out of parent process memory */
   arguments.command_line = malloc(command_line_size);
   strlcpy(arguments.command_line, command_line, command_line_size);
@@ -164,12 +160,11 @@ start_process (struct parameters_to_start_process* parameters)
 	 allocated memory for a process stack. The stack top is in
 	 if_.esp, now we must prepare and place the arguments to main on
 	 the stack. */
-      //      sema_down(&(process_id_table_lock));
-      plist_value_t value = plist_form_process_info(thread_current()->tid, parameters->parent_element_id);
-      debug("Value: proc_id:%i, parent_element_id:%i\n",value.proc_id, value.parent_id);
-      thread_current()->element_id = plist_insert(process_id_table,value );
-      plist_print_list(process_id_table);  
-      //   sema_up(&(process_id_table_lock));
+
+      plist_value_t value = plist_form_process_info(parameters->parent_id);
+      thread_current()->tid = plist_insert(&process_id_table,value );
+      plist_print_list(&process_id_table);  
+
       /* A temporary solution is to modify the stack pointer to
 	 "pretend" the arguments are present on the stack. A normal
        C-function expects the stack to contain, in order, the return
@@ -268,10 +263,9 @@ process_cleanup (void)
    */
   printf("%s: exit(%d)\n", thread_name(), status);
 
-  // sema_down(&(process_id_table_lock));
-  plist_remove(process_id_table, cur->element_id,status);
-  //plist_free(process_id_table);
-  //sema_up(&(process_id_table_lock));  
+  plist_remove(&process_id_table, cur->tid,status);
+  plist_clean(&process_id_table);
+  plist_print_list(&process_id_table);
   
   map_close_all_files(&(thread_current()->open_file_table));
 
@@ -329,7 +323,7 @@ void* createStack(const char * command_line, void* stack_top)
   
   /* calculate the bytes needed to store the command_line */
   line_size = 1; 
-  char* c = command_line;
+  const char* c = command_line;
   while(*(c++) != '\0')
     {
       line_size++;
@@ -339,7 +333,7 @@ void* createStack(const char * command_line, void* stack_top)
   line_size += line_size % 4 == 0 ? 0: 4 - line_size % 4;
   /* calculate how many words the command_line contain */
   argc = 0;
-  c = command_line; ;
+  c = command_line;
   char prev = ' ';
   while(*c != '\0')
     {
@@ -416,5 +410,6 @@ void* createStack(const char * command_line, void* stack_top)
 
   //*(cmd_line_on_stack - (argc+4)*4) = esp->ret;
   *(cmd_line_on_stack - (argc+4)*4) = 0;
+  debug("Stackproblems\n");
   return esp; /* the new stack top */
 }

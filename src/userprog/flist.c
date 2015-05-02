@@ -97,10 +97,10 @@ void map_close_all_files(struct map * m)
   for(i = 0; i< MAP_SIZE; i++)
     {
       value_t t = m->content[i];
-      debug("What's inside?: %i, %i\n",t,i);
+      //debug("What's inside?: %i, %i\n",t,i);
       if(t != NULL)
 	{
-	  // map_close_file(m, i+offset);
+	  map_close_file(m, i+offset);
 	}
 
     }

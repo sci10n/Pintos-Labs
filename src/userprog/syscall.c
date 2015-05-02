@@ -194,7 +194,8 @@ syscall_handler (struct intr_frame *f)
       break;
     case SYS_SLEEP:
       {
-	timer_sleep((int)(esp[1]));
+	debug("Sleep with: %i\n", (int)(esp[1]));
+	timer_msleep((int)(esp[1]));
       }
       break;
     case SYS_PLIST:

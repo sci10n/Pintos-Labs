@@ -5,6 +5,8 @@
 typedef struct process_info plist_value_t;
 typedef struct process_list process_list;
 typedef int plist_key_t;
+
+#define PLIST_MAX 61
 /* Place functions to handle a running process here (process list).
    
    plist.h : Your function declarations and documentation.
@@ -33,44 +35,34 @@ typedef int plist_key_t;
 */
 struct process_info
 {
-     	
-bool free;
-int proc_id;
-int parent_id;
-int exit_status;
-bool alive;
-bool parent_alive;
+  bool free;
+  int parent_id;
+  int exit_status;
+  bool alive;
+  bool parent_alive;
 };
 
 struct process_list
 {
-  plist_key_t element_id;
-  plist_value_t element;
-  process_list * next;
+plist_value_t table[PLIST_MAX];
 };
 
-void init_fatlock();
-process_list* plist_allocate_list_entry(plist_value_t v);
+void init_fatlock(process_list* list);
 
-plist_value_t plist_form_process_info(int proc_id, int parent_id);
-plist_value_t plist_form_process_info_r(int proc_id, int parent_id);
-
+plist_value_t plist_form_process_info(int parent_id);
 //Returns a number to find and remove the element later NOT THE PROCESS ID
 plist_key_t plist_insert(process_list* list, plist_value_t v);
-plist_key_t plist_insert_r(process_list* list, plist_value_t v);
 
-plist_value_t* plist_find(process_list*list, plist_key_t element_id);
-plist_value_t* plist_find_r(process_list*list, plist_key_t element_id);
+//returns -1 if cant find and places return value in parameter return_value
+int plist_find(process_list* list,plist_value_t*return_value,  plist_key_t element_id);
 
-bool plist_remove(process_list*list, plist_key_t element_id, int exit_status);
-bool plist_remove_r(process_list*list, plist_key_t element_id, int exit_status);
+bool plist_remove(process_list* list, plist_key_t element_id, int exit_status);
 
-void plist_remove_children(process_list*list, int parent_element_id);
+void plist_remove_children(process_list* list, int parent_element_id);
 
-void plist_free(process_list*list);
+void plist_clean(process_list* list);
 
-void plist_print_list(process_list * list);
-void plist_print_list_r(process_list * list);
+void plist_print_list(process_list*  list);
 
 
 #endif

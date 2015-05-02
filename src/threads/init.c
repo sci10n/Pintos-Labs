@@ -88,11 +88,12 @@ main (void)
   printf ("Pintos booting with %'zu kB RAM...\n", ram_pages * PGSIZE / 1024);
 
   /* Initialize memory system. */
+  process_init ();
   palloc_init ();
   malloc_init ();
   paging_init ();
 
-  process_init ();
+
 
   /* Segmentation. */
 #ifdef USERPROG
