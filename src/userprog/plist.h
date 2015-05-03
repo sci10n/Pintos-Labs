@@ -2,11 +2,11 @@
 #define _PLIST_H_
 #include <stdbool.h>
 #include <stdlib.h>
+#include "threads/synch.h"
 typedef struct process_info plist_value_t;
 typedef struct process_list process_list;
 typedef int plist_key_t;
-
-#define PLIST_MAX 61
+#define PLIST_MAX 7
 /* Place functions to handle a running process here (process list).
    
    plist.h : Your function declarations and documentation.
@@ -40,6 +40,8 @@ struct process_info
   int exit_status;
   bool alive;
   bool parent_alive;
+  struct semaphore is_done;
+  //semaphore wait for child?
 };
 
 struct process_list
@@ -56,7 +58,9 @@ plist_key_t plist_insert(process_list* list, plist_value_t v);
 //returns -1 if cant find and places return value in parameter return_value
 int plist_find(process_list* list,plist_value_t*return_value,  plist_key_t element_id);
 
-bool plist_remove(process_list* list, plist_key_t element_id, int exit_status);
+void plist_set_exit_status(process_list* list, plist_key_t element_id, int exit_status);
+int plist_get_exit_status(process_list* list, plist_key_t element_id);
+bool plist_remove(process_list* list, plist_key_t element_id);
 
 void plist_remove_children(process_list* list, int parent_element_id);
 

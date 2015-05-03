@@ -40,6 +40,7 @@ void process_init(void)
  * from thread_exit - do not call cleanup twice! */
 void process_exit(int status UNUSED)
 {
+  plist_set_exit_status(&process_id_table, thread_current()->tid,status);
 }
 
 /* Print a list of all running processes. The list shall include all
@@ -164,22 +165,27 @@ start_process (struct parameters_to_start_process* parameters)
       plist_value_t value = plist_form_process_info(parameters->parent_id);
       thread_current()->tid = plist_insert(&process_id_table,value );
       plist_print_list(&process_id_table);  
+      if(thread_current()->tid == -1)
+	success = false;
+      else
+	{
+	  /* A temporary solution is to modify the stack pointer to
+	     "pretend" the arguments are present on the stack. A normal
+	     C-function expects the stack to contain, in order, the return
+	     address, the first argument, the second argument etc. */
+	  if_.esp = createStack(parameters->command_line, if_.esp);
+	  //HACK if_.esp -= 12; /* Unacceptable solution. */
 
-      /* A temporary solution is to modify the stack pointer to
-	 "pretend" the arguments are present on the stack. A normal
-       C-function expects the stack to contain, in order, the return
-       address, the first argument, the second argument etc. */
-    if_.esp = createStack(parameters->command_line, if_.esp);
-    //HACK if_.esp -= 12; /* Unacceptable solution. */
-
-    /* The stack and stack pointer should be setup correct just before
-       the process start, so this is the place to dump stack content
-       for debug purposes. Disable the dump when it works. */
+	  /* The stack and stack pointer should be setup correct just before
+	     the process start, so this is the place to dump stack content
+	     for debug purposes. Disable the dump when it works. */
     
-    dump_stack ( PHYS_BASE + 15, PHYS_BASE - if_.esp + 16 );
-    parameters->process_id = thread_current()->tid;
-    sema_up(&(parameters->semaphore_process_id));
+	  // dump_stack ( PHYS_BASE + 15, PHYS_BASE - if_.esp + 16 );
 
+
+	}
+	  parameters->process_id = thread_current()->tid;
+	  sema_up(&(parameters->semaphore_process_id));
   }
 
   debug("%s#%d: start_process(\"%s\") DONE\n",
@@ -221,12 +227,14 @@ start_process (struct parameters_to_start_process* parameters)
 int
 process_wait (int child_id) 
 {
-  int status = -1;
+
   struct thread *cur = thread_current ();
 
   debug("%s#%d: process_wait(%d) ENTERED\n",
         cur->name, cur->tid, child_id);
   /* Yes! You need to do something good here ! */
+  plist_wait_for_pid(&process_id_table,child_id);
+  int status = plist_get_exit_status(&process_id_table,child_id);
   debug("%s#%d: process_wait(%d) RETURNS %d\n",
         cur->name, cur->tid, child_id, status);
   
@@ -250,9 +258,9 @@ process_cleanup (void)
 {
   struct thread  *cur = thread_current ();
   uint32_t       *pd  = cur->pagedir;
-  int status = -1;
+  //int status = plist_get_exit_status(&process_id_table,cur->tid);
   
-  debug("%s#%d: process_cleanup() ENTERED\n", cur->name, cur->tid);
+  debug("%s#%i: process_cleanup() ENTERED\n", cur->name, cur->tid);
   
   /* Later tests DEPEND on this output to work correct. You will have
    * to find the actual exit status in your process list. It is
@@ -261,9 +269,9 @@ process_cleanup (void)
    * that may sometimes poweroff as soon as process_wait() returns,
    * possibly before the prontf is completed.)
    */
-  printf("%s: exit(%d)\n", thread_name(), status);
+  //printf("%s: exit(%i)\n", thread_name(), status);
 
-  plist_remove(&process_id_table, cur->tid,status);
+  plist_remove(&process_id_table, cur->tid);
   plist_clean(&process_id_table);
   plist_print_list(&process_id_table);
   
@@ -284,8 +292,8 @@ process_cleanup (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }  
-  debug("%s#%d: process_cleanup() DONE with status %d\n",
-        cur->name, cur->tid, status);
+  //debug("%s#%i: process_cleanup() DONE with status %i\n",
+  //      cur->name, cur->tid, status);
 }
 
 /* Sets up the CPU for running user code in the current

@@ -55,9 +55,19 @@ syscall_handler (struct intr_frame *f)
       power_off();
       break;
     case SYS_EXIT:
+      {
       // printf("LOG [DEBUG]: in SYS_EXIT\n");
       // printf("LOG [DEBIG]: argument: %i\n",esp[1]);
+      int exit_status = (int)(esp[1]);
+      process_exit(exit_status);
       thread_exit();
+      }
+      break;
+    case SYS_WAIT:
+      {
+      int pid = esp[1];
+      process_wait (pid);
+      }
       break;
     case SYS_READ:
       {

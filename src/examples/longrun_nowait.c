@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define MAX_SIMULTANEOUS 51
+#define MAX_SIMULTANEOUS 61
 #define MAX_REPEAT 1000
 #define BUF_SIZE 64
 
