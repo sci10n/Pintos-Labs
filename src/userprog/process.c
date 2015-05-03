@@ -258,6 +258,7 @@ process_cleanup (void)
 {
   struct thread  *cur = thread_current ();
   uint32_t       *pd  = cur->pagedir;
+  int status = plist_get_exit_status(&process_id_table,cur->tid);
   //int status = plist_get_exit_status(&process_id_table,cur->tid);
   
   debug("%s#%i: process_cleanup() ENTERED\n", cur->name, cur->tid);
@@ -269,7 +270,7 @@ process_cleanup (void)
    * that may sometimes poweroff as soon as process_wait() returns,
    * possibly before the prontf is completed.)
    */
-  //printf("%s: exit(%i)\n", thread_name(), status);
+  printf("%s: exit(%i)\n", thread_name(), status);
 
   plist_remove(&process_id_table, cur->tid);
   plist_clean(&process_id_table);

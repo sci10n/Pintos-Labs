@@ -34,6 +34,7 @@ plist_value_t plist_form_process_info(int parent_id)
   t.parent_alive = parent_id != -1;
   t.parent_id = parent_id;
   t.free = false;
+  t.is_waiting =false;
   t.exit_status = undefined;
   sema_up(&plist_fatlock);
   debug("Exit process_info\n");
@@ -114,6 +115,11 @@ int plist_get_exit_status(process_list* list, plist_key_t element_id)
 
 void plist_wait_for_pid(process_list*list,plist_key_t element_id)
 {
+  sema_down(&plist_fatlock);
+  list->table[element_id].is_waiting = true;
+  bool waiting = true;
+  sema_up(&plist_fatlock);
+  if(!waiting)
   sema_down(&(list->table[element_id].is_done));
 }
 

@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define MAX_SIMULTANEOUS 5
+#define MAX_SIMULTANEOUS 50
 #define MAX_REPEAT 1000
 
 int main(int argc, char* argv[])
@@ -70,7 +70,6 @@ int main(int argc, char* argv[])
       snprintf(cmd, 15, "dummy %i", j * simul + i);
       pid[i] = exec(cmd);
     }
-    printf("HELLO WORLD\n");
     /* There will never be more than 'simul' processes running
      * simultaneously, but in total there will be a lot of processes
      * (repeat * simul). Just as you can expect in a real system.

@@ -6,7 +6,7 @@
 typedef struct process_info plist_value_t;
 typedef struct process_list process_list;
 typedef int plist_key_t;
-#define PLIST_MAX 7
+#define PLIST_MAX 100
 /* Place functions to handle a running process here (process list).
    
    plist.h : Your function declarations and documentation.
@@ -40,6 +40,7 @@ struct process_info
   int exit_status;
   bool alive;
   bool parent_alive;
+  bool is_waiting;
   struct semaphore is_done;
   //semaphore wait for child?
 };
