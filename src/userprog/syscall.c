@@ -67,7 +67,8 @@ syscall_handler (struct intr_frame *f)
     case SYS_WAIT:
       {
       int pid = esp[1];
-      process_wait (pid);
+      int status = process_wait (pid);
+      f->eax = status;
       }
       break;
     case SYS_READ:

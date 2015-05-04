@@ -119,12 +119,7 @@ int plist_get_exit_status(process_list* list, plist_key_t element_id)
   #if plist_debug
   debug("Enterd get_exit_status\n");
   #endif
-  sema_down(&plist_fatlock);
   int ret = -1;
-  bool isFree = list->table[element_id].free;
-  sema_up(&plist_fatlock);
-  if(isFree)
-    return -1;
   sema_down(&plist_fatlock);
   ret = list->table[element_id].exit_status;
   list->table[element_id].free = true;
@@ -135,7 +130,7 @@ int plist_get_exit_status(process_list* list, plist_key_t element_id)
   return ret;
 }
 
-void plist_wait_for_pid(process_list*list,plist_key_t element_id)
+bool plist_wait_for_pid(process_list*list,plist_key_t element_id)
 {
   sema_down(&plist_fatlock);
   bool waiting = list->table[element_id].is_waiting;
@@ -145,7 +140,9 @@ void plist_wait_for_pid(process_list*list,plist_key_t element_id)
    sema_down(&plist_fatlock);
    list->table[element_id].is_waiting = true;
    sema_up(&plist_fatlock);
+   return true;
   }
+  return false;
 }
 
 bool plist_remove(process_list* list, plist_key_t element_id)

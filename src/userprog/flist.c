@@ -3,6 +3,7 @@
 #include "flist.h"
 #define offset 2
 #define flist_debug 0
+
 void map_init(struct map* m)
 {
 #if flist_debug
@@ -23,7 +24,6 @@ key_t map_insert(struct map* m, value_t v)
   debug("Enterd map_insert\n");
 #endif
   int i = 0;
-  // printf("INSERTING INTO FLE TABLE\n");
   if(v == NULL)
     {
 #if flist_debug
@@ -33,11 +33,11 @@ key_t map_insert(struct map* m, value_t v)
     }
 
   for(i = 0; i <MAP_SIZE; i++){
-    //printf("On index %i %s\n", i, m->content[i]);
+    
     if(m->content[i] == NULL)
       {
 	m->content[i] = v;
-	//	printf("Return: %i for %u\n", i , v);
+	
 #if flist_debug
 	debug("Exit map_insert with %i\n", i + offset);
 #endif
