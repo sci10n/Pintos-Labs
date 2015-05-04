@@ -52,6 +52,7 @@ syscall_handler (struct intr_frame *f)
     {
     case SYS_HALT:
       // printf("LOG [DEBUG]: in SYS_HALT\n");
+    debug("HELLO FUCKING WORLD\n");
       power_off();
       break;
     case SYS_EXIT:
@@ -220,10 +221,10 @@ syscall_handler (struct intr_frame *f)
       break;
     default:
       {
-	printf ("Executed an unknown system call!\n");
+	//	printf ("Executed an unknown system call!\n");
       
-	printf ("Stack top + 0: %d\n", esp[0]);
-	printf ("Stack top + 1: %d\n", esp[1]);
+	//	printf ("Stack top + 0: %d\n", esp[0]);
+	//	printf ("Stack top + 1: %d\n", esp[1]);
       
 	thread_exit ();
       }

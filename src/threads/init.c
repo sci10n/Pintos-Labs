@@ -82,13 +82,14 @@ main (void)
   /* Initialize ourselves as a thread so we can use locks,
      then enable console locking. */
   thread_init ();
+    process_init ();
   console_init ();  
   
   /* Greet user. */
   printf ("Pintos booting with %'zu kB RAM...\n", ram_pages * PGSIZE / 1024);
 
   /* Initialize memory system. */
-  process_init ();
+
   palloc_init ();
   malloc_init ();
   paging_init ();

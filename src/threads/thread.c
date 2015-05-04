@@ -316,6 +316,7 @@ thread_exit (void)
 
 #ifdef USERPROG
   process_cleanup ();
+  map_close_all_files(&(thread_current()->open_file_table));
 #endif
 
   /* Just set our status to dying and schedule another process.

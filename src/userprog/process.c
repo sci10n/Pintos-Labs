@@ -164,7 +164,6 @@ start_process (struct parameters_to_start_process* parameters)
 
       plist_value_t value = plist_form_process_info(parameters->parent_id);
       thread_current()->tid = plist_insert(&process_id_table,value );
-      plist_print_list(&process_id_table);  
       if(thread_current()->tid == -1)
 	success = false;
       else
@@ -201,7 +200,7 @@ start_process (struct parameters_to_start_process* parameters)
   */
   if ( ! success )
     {
-      debug("#problem with start process\n");
+      debug("# problem with start process\n");
       parameters->process_id = -1;
       sema_up(&(parameters->semaphore_process_id));
       thread_exit ();
@@ -230,13 +229,13 @@ process_wait (int child_id)
 
   struct thread *cur = thread_current ();
 
-  debug("%s#%d: process_wait(%d) ENTERED\n",
-        cur->name, cur->tid, child_id);
+  //debug("%s#%d: process_wait(%d) ENTERED\n",
+  //      cur->name, cur->tid, child_id);
   /* Yes! You need to do something good here ! */
   plist_wait_for_pid(&process_id_table,child_id);
   int status = plist_get_exit_status(&process_id_table,child_id);
-  debug("%s#%d: process_wait(%d) RETURNS %d\n",
-        cur->name, cur->tid, child_id, status);
+  //debug("%s#%d: process_wait(%d) RETURNS %d\n",
+  //      cur->name, cur->tid, child_id, status);
   
   return status;
 }
@@ -274,10 +273,9 @@ process_cleanup (void)
 
   plist_remove(&process_id_table, cur->tid);
   plist_clean(&process_id_table);
-  plist_print_list(&process_id_table);
+  // plist_print_list(&process_id_table);
   
-  map_close_all_files(&(thread_current()->open_file_table));
-
+  
 /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   if (pd != NULL) 
@@ -419,6 +417,5 @@ void* createStack(const char * command_line, void* stack_top)
 
   //*(cmd_line_on_stack - (argc+4)*4) = esp->ret;
   *(cmd_line_on_stack - (argc+4)*4) = 0;
-  debug("Stackproblems\n");
   return esp; /* the new stack top */
 }

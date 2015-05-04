@@ -2,25 +2,33 @@
 #include <stdio.h>
 #include "flist.h"
 #define offset 2
-
+#define flist_debug 0
 void map_init(struct map* m)
 {
+#if flist_debug
   debug("Enterd map_init\n");
+#endif
   int i;
   for(i = 0; i < MAP_SIZE; i++)
     m->content[i] =NULL;
   lock_init(&(m->lock));
+#if flist_debug
   debug("Exit map_init\n");
+#endif
 }
 
 key_t map_insert(struct map* m, value_t v)
 {
-    debug("Enterd map_insert\n");
+#if flist_debug
+  debug("Enterd map_insert\n");
+#endif
   int i = 0;
   // printf("INSERTING INTO FLE TABLE\n");
   if(v == NULL)
     {
-  debug("Exit map_insert with -1\n");
+#if flist_debug
+      debug("Exit map_insert with -1\n");
+#endif
       return -1;
     }
 
@@ -30,11 +38,15 @@ key_t map_insert(struct map* m, value_t v)
       {
 	m->content[i] = v;
 	//	printf("Return: %i for %u\n", i , v);
+#if flist_debug
 	debug("Exit map_insert with %i\n", i + offset);
+#endif
 	return i + offset;
       }
   }
+#if flist_debug
   debug("Exit map_insert with -1\n");
+#endif
   return -1;
 }
 
@@ -47,10 +59,14 @@ value_t map_find(struct map* m, key_t k)
 value_t map_remove(struct map* m, key_t k)
 {
   lock_acquire(&(m->lock));
+#if flist_debug
   debug("Enterd map_remove with k: %i , offset: %i\n", k, offset);
+#endif
   value_t rvalue = m->content[k - offset];
   m->content[k - offset] = NULL;
+#if flist_debug
   debug("Exit map_remove\n");
+#endif
   lock_release(&(m->lock));
   return rvalue;
 }
@@ -74,23 +90,33 @@ void map_remove_if(struct map* m, bool (*cond)(key_t k, value_t v, int aux), int
 
 void map_close_file(struct map* m, key_t k)
 {
+#if flist_debug
   debug("Enterd map_close_files\n");
+#endif
   value_t t = map_remove(m,k);
+#if flist_debug
   debug("map_remove returned: %i\n", t);
+#endif
   if(t != NULL)
     {
       filesys_close(t);
     }
+#if flist_debug
   debug("Exit map_close_files\n");
+#endif
 }
 
 void map_close_all_files(struct map * m)
 {
+#if flist_debug
   debug("Enterd map_close_all_files\n");
+#endif
   if(m == NULL)
     {
-  debug("Exit map_close_all_files\n");
-    return;
+#if flist_debug
+      debug("Exit map_close_all_files\n");
+#endif
+      return;
     }
 
   int i;
@@ -104,6 +130,7 @@ void map_close_all_files(struct map * m)
 	}
 
     }
-
+#if flist_debug
   debug("Exit map_close_all_files\n");
+#endif
 }
