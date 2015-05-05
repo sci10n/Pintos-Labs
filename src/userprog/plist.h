@@ -6,7 +6,7 @@
 typedef struct process_info plist_value_t;
 typedef struct process_list process_list;
 typedef int plist_key_t;
-#define PLIST_MAX 100
+#define PLIST_MAX 61
 /* Place functions to handle a running process here (process list).
    
    plist.h : Your function declarations and documentation.

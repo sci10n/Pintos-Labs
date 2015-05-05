@@ -229,16 +229,16 @@ process_wait (int child_id)
 
   struct thread *cur = thread_current ();
   int status = -1;
-  //debug("%s#%d: process_wait(%d) ENTERED\n",
-  //      cur->name, cur->tid, child_id);
+  debug("%s#%d: process_wait(%d) ENTERED\n",
+        cur->name, cur->tid, child_id);
   /* Yes! You need to do something good here ! */
   if(plist_wait_for_pid(&process_id_table,child_id))
   {
     status = plist_get_exit_status(&process_id_table,child_id);
   }
   
-  //debug("%s#%d: process_wait(%d) RETURNS %d\n",
-  //      cur->name, cur->tid, child_id, status);
+  debug("%s#%d: process_wait(%d) RETURNS %d\n",
+        cur->name, cur->tid, child_id, status);
    return status;
  
 }
