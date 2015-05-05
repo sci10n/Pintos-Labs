@@ -29,10 +29,9 @@ void init_fatlock(process_list * list)
 
 plist_value_t plist_form_process_info(int parent_id)
 {
-  #if plist_debug
+  #if plist_debugz
   debug("Enterd process_info\n");
   #endif
-  sema_down(&plist_fatlock);
   plist_value_t t;
   t.alive = true;
   //check if parent = idle thread (tid = -1)
@@ -41,7 +40,6 @@ plist_value_t plist_form_process_info(int parent_id)
   t.free = false;
   t.is_waiting =false;
   t.exit_status = undefined;
-  sema_up(&plist_fatlock);
   #if plist_debug
   debug("Exit process_info\n");
   #endif
@@ -57,7 +55,11 @@ int plist_find(process_list* list,plist_value_t* return_value,  plist_key_t elem
 
   plist_value_t ret = list->table[element_id];
   if(ret.free || ret.parent_id == undefined)
-    return -1;
+  {
+      sema_up(&plist_fatlock);
+        return -1;
+  }
+
   return_value = &(list->table[element_id]);
   sema_up(&plist_fatlock);
   #if plist_debug
@@ -121,8 +123,11 @@ int plist_get_exit_status(process_list* list, plist_key_t element_id)
   #endif
   int ret = -1;
   sema_down(&plist_fatlock);
+  if(!list->table[element_id].free)
+  {
   ret = list->table[element_id].exit_status;
   list->table[element_id].free = true;
+  }
   sema_up(&plist_fatlock);
   #if plist_debug
   debug("Exit get exit_status with %i\n",ret);

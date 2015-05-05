@@ -40,7 +40,7 @@ void process_init(void)
  * from thread_exit - do not call cleanup twice! */
 void process_exit(int status UNUSED)
 {
-  plist_set_exit_status(&process_id_table, thread_current()->tid,status);
+  plist_set_exit_status(&process_id_table, thread_current()->pid,status);
 }
 
 /* Print a list of all running processes. The list shall include all
@@ -83,7 +83,7 @@ process_execute (const char *command_line)
         thread_current()->tid,
         command_line);
   struct parameters_to_start_process arguments;
-  arguments.parent_id = thread_current()->tid;
+  arguments.parent_id = thread_current()->pid;
   /* COPY command line out of parent process memory */
   arguments.command_line = malloc(command_line_size);
   strlcpy(arguments.command_line, command_line, command_line_size);
@@ -104,18 +104,13 @@ process_execute (const char *command_line)
     {
       sema_down(&(arguments.semaphore_process_id));
       process_id =arguments.process_id;
-      if(process_id != -1)
-	{
-	  debug("Returned to process_execute with valid id\n");
-	  //Add to list
-	}
     }
   /* AVOID bad stuff by turning off. YOU will fix this! */
   //power_off();
 
   
   /* WHICH thread may still be using this right now? */
-  // free(arguments.command_line);
+   //free(arguments.command_line);
 
   debug("%s#%d: process_execute(\"%s\") RETURNS %d\n",
         thread_current()->name,
@@ -163,8 +158,8 @@ start_process (struct parameters_to_start_process* parameters)
 	 the stack. */
 
       plist_value_t value = plist_form_process_info(parameters->parent_id);
-      thread_current()->tid = plist_insert(&process_id_table,value );
-      if(thread_current()->tid == -1)
+      thread_current()->pid = plist_insert(&process_id_table,value );
+      if(thread_current()->pid == -1)
 	success = false;
       else
 	{
@@ -181,10 +176,10 @@ start_process (struct parameters_to_start_process* parameters)
     
 	  // dump_stack ( PHYS_BASE + 15, PHYS_BASE - if_.esp + 16 );
 
-
+    parameters->process_id = thread_current()->pid;
+    sema_up(&(parameters->semaphore_process_id));
 	}
-	  parameters->process_id = thread_current()->tid;
-	  sema_up(&(parameters->semaphore_process_id));
+
   }
 
   debug("%s#%d: start_process(\"%s\") DONE\n",
@@ -198,6 +193,7 @@ start_process (struct parameters_to_start_process* parameters)
      - File do not contain a valid program
      - Not enough memory
   */
+     free(parameters->command_line);
   if ( ! success )
     {
       debug("# problem with start process\n");
@@ -227,18 +223,18 @@ int
 process_wait (int child_id) 
 {
 
-  struct thread *cur = thread_current ();
+  //struct thread *cur = thread_current ();
   int status = -1;
-  debug("%s#%d: process_wait(%d) ENTERED\n",
-        cur->name, cur->tid, child_id);
+  //debug("%s#%d: process_wait(%d) ENTERED\n",
+   //     cur->name, cur->tid, child_id);
   /* Yes! You need to do something good here ! */
   if(plist_wait_for_pid(&process_id_table,child_id))
   {
     status = plist_get_exit_status(&process_id_table,child_id);
   }
   
-  debug("%s#%d: process_wait(%d) RETURNS %d\n",
-        cur->name, cur->tid, child_id, status);
+  //debug("%s#%d: process_wait(%d) RETURNS %d\n",
+   //     cur->name, cur->tid, child_id, status);
    return status;
  
 }
@@ -260,10 +256,10 @@ process_cleanup (void)
 {
   struct thread  *cur = thread_current ();
   uint32_t       *pd  = cur->pagedir;
-  int status = plist_get_exit_status(&process_id_table,cur->tid);
+  int status = plist_get_exit_status(&process_id_table,cur->pid);
   //int status = plist_get_exit_status(&process_id_table,cur->tid);
   
-  debug("%s#%i: process_cleanup() ENTERED\n", cur->name, cur->tid);
+  debug("%s#%i: process_cleanup() ENTERED\n", cur->name, cur->pid);
   
   /* Later tests DEPEND on this output to work correct. You will have
    * to find the actual exit status in your process list. It is
@@ -274,7 +270,7 @@ process_cleanup (void)
    */
   printf("%s: exit(%i)\n", thread_name(), status);
 
-  plist_remove(&process_id_table, cur->tid);
+  plist_remove(&process_id_table, cur->pid);
   plist_clean(&process_id_table);
   // plist_print_list(&process_id_table);
   

@@ -194,7 +194,6 @@ syscall_init (void)
    		break;
    		case SYS_SLEEP:
    		{
-   			debug("Sleep with: %i\n", (int)(esp[1]));
    			timer_msleep((int)(esp[1]));
    		}
    		break;
