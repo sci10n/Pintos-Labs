@@ -60,11 +60,13 @@ byte_to_sector (const struct inode *inode, off_t pos)
    returns the same `struct inode'. */
 static struct list open_inodes;
 
+/*CHANGE*/ struct lock inode_list_lock;
 /* Initializes the inode module. */
 void
 inode_init (void) 
 {
   list_init (&open_inodes);
+  /*CHANGE*/ lock_init(&(inode_list_lock));
 }
 
 /* Initializes an inode with LENGTH bytes of data and
@@ -117,7 +119,7 @@ inode_open (disk_sector_t sector)
   struct list_elem *e;
   struct inode *inode;
 
-  
+  /*CHANGE*/ lock_acquire(&inode_list_lock);
   /* Check whether this inode is already open. */
   for (e = list_begin (&open_inodes); e != list_end (&open_inodes);
        e = list_next (e)) 
@@ -126,6 +128,7 @@ inode_open (disk_sector_t sector)
       if (inode->sector == sector) 
         {
           inode_reopen (inode);
+          /*CHANGE*/ lock_release(&inode_list_lock);
           return inode; 
         }
     }
@@ -134,6 +137,7 @@ inode_open (disk_sector_t sector)
   inode = malloc (sizeof *inode);
   if (inode == NULL)
   {
+    /*CHANGE*/ lock_release(&inode_list_lock);
     return NULL;
   }
   
@@ -145,7 +149,7 @@ inode_open (disk_sector_t sector)
   inode->removed = false;
   /*CHANGE*/ lock_init(&(inode->inode_lock));
   disk_read (filesys_disk, inode->sector, &inode->data);
-  
+  /*CHANGE*/ lock_release(&inode_list_lock);
   return inode;
 }
 
@@ -166,9 +170,9 @@ inode_reopen (struct inode *inode)
 disk_sector_t
 inode_get_inumber (const struct inode *inode)
 {
-  /*CHANGE*/ lock_acquire(&(inode->inode_lock));
-  /*CHANGE*/ disk_sector_t tmp = inode->sector;
-  /*CHANGE*/ lock_release(&(inode->inode_lock));
+  //CHANGE// lock_acquire(&(inode->inode_lock));
+  disk_sector_t tmp = inode->sector;
+  //CHANGE// lock_release(&(inode->inode_lock));
   return tmp;
 }
 
@@ -197,11 +201,12 @@ inode_close (struct inode *inode)
           free_map_release (inode->data.start,
                             bytes_to_sectors (inode->data.length)); 
         }
-
-      free (inode);
       /*CHANGE*/ lock_release(&(inode->inode_lock));
+      free (inode);
+
       return;
     }
+    /*CHANGE*/ lock_release(&(inode->inode_lock));
 }
 
 /* Marks INODE to be deleted when it is closed by the last caller who
