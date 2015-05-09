@@ -32,7 +32,6 @@ plist_value_t plist_form_process_info(int parent_id)
   #if plist_debug
   debug("Enterd process_info\n");
   #endif
-  sema_down(&plist_fatlock);
   plist_value_t t;
   t.alive = true;
   //check if parent = idle thread (tid = -1)
@@ -41,7 +40,6 @@ plist_value_t plist_form_process_info(int parent_id)
   t.free = false;
   t.is_waiting =false;
   t.exit_status = undefined;
-  sema_up(&plist_fatlock);
   #if plist_debug
   debug("Exit process_info\n");
   #endif
