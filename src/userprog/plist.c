@@ -117,10 +117,12 @@ int plist_get_exit_status(process_list* list, plist_key_t element_id)
   #if plist_debug
   debug("Enterd get_exit_status\n");
   #endif
-  int ret = -1;
+    if(element_id == -1)
+      return -1;
+  int ret = 0;
   sema_down(&plist_fatlock);
-  ret = list->table[element_id].exit_status;
-  list->table[element_id].free = true;
+  if(!list->table[element_id].free)
+    ret = list->table[element_id].exit_status;
   sema_up(&plist_fatlock);
   #if plist_debug
   debug("Exit get exit_status with %i\n",ret);
@@ -164,8 +166,8 @@ bool plist_remove(process_list* list, plist_key_t element_id)
         }
       }
       list->table[element_id].alive = false;
-      list->table[element_id].free = !list->table[element_id].alive && !list->table[element_id].parent_alive;
-      //
+      list->table[element_id].free = !list->table[element_id].alive && !list->table[element_id].parent_alive;  
+      sema_up(&(list->table[element_id].is_done));
       ret = true;
     }
     sema_up(&plist_fatlock);

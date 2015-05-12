@@ -186,7 +186,7 @@ start_process (struct parameters_to_start_process* parameters)
 	 
 
   }
-
+  free(parameters->command_line);
   //debug("%s#%d: start_process(\"%s\") DONE\n",
   //      thread_current()->name,
   //      thread_current()->tid,

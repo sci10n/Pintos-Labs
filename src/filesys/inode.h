@@ -19,4 +19,7 @@ off_t inode_read_at (struct inode *, void *, off_t size, off_t offset);
 off_t inode_write_at (struct inode *, const void *, off_t size, off_t offset);
 off_t inode_length (const struct inode *);
 
+void inode_dir_lock(struct inode *);
+void inode_dir_unlock(struct inode *);
+void inode_dir_init(struct inode *);
 #endif /* filesys/inode.h */
