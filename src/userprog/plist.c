@@ -130,10 +130,15 @@ int plist_get_exit_status(process_list* list, plist_key_t element_id)
   return ret;
 }
 
-bool plist_wait_for_pid(process_list*list,plist_key_t element_id)
+bool plist_wait_for_pid(process_list*list,plist_key_t element_id, plist_key_t current_id)
 {
   sema_down(&plist_fatlock);
   bool waiting = list->table[element_id].is_waiting;
+  if(element_id == current_id || list->table[element_id].parent_id != current_id)
+  {
+    sema_up(&plist_fatlock);
+    return false;
+  }
   sema_up(&plist_fatlock);
   if(!waiting){
   sema_down(&(list->table[element_id].is_done));

@@ -232,7 +232,7 @@ process_wait (int child_id)
   //debug("%s#%d: process_wait(%d) ENTERED\n",
     //    cur->name, cur->pid, child_id);
   /* Yes! You need to do something good here ! */
-  if(plist_wait_for_pid(&process_id_table,child_id))
+  if(plist_wait_for_pid(&process_id_table,child_id, cur->pid))
   {
     status = plist_get_exit_status(&process_id_table,child_id);
   }

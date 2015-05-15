@@ -46,7 +46,7 @@ free_map_allocate (size_t cnt, disk_sector_t *sectorp)
 #if free_map_debug
   debug("free_map_allocate enter\n");
 #endif
-  //lock_acquire(&free_map_lock);
+  lock_acquire(&free_map_lock);
 
   sector = bitmap_scan_and_flip (free_map, 0, cnt, false);
   if (sector != BITMAP_ERROR
@@ -56,7 +56,7 @@ free_map_allocate (size_t cnt, disk_sector_t *sectorp)
     bitmap_set_multiple (free_map, sector, cnt, false);
     sector = BITMAP_ERROR;
   }
-  //lock_release(&free_map_lock);
+  lock_release(&free_map_lock);
 
 
   if (sector != BITMAP_ERROR)
@@ -82,7 +82,7 @@ free_map_release (disk_sector_t sector, size_t cnt)
   bitmap_set_multiple (free_map, sector, cnt, false);
   bitmap_write (free_map, free_map_file);
   lock_release(&free_map_lock);
-  ////CHANGE// lock_release(&free_map_lock);
+  //lock_release(&free_map_lock);
 
   //CHANGE//
 #if free_map_debug
@@ -102,10 +102,10 @@ free_map_open (void)
   if (free_map_file == NULL)
     PANIC ("can't open free map");
 // //CHANGE// lock_acquire(&free_map_lock);
-    lock_acquire(&free_map_lock);
+   // lock_acquire(&free_map_lock);
   if (!bitmap_read (free_map, free_map_file))
     PANIC ("can't read free map");
-  lock_release(&free_map_lock);
+ // lock_release(&free_map_lock);
 //  //CHANGE// lock_release(&free_map_lock);
   //CHANGE//
 #if free_map_debug
@@ -137,7 +137,7 @@ free_map_create (void)
   debug("free_map_create enter\n");
 #endif
 //  //CHANGE// lock_acquire(&free_map_lock);
-  lock_acquire(&free_map_lock);
+  //lock_acquire(&free_map_lock);
   /* Create inode. */
   if (!inode_create (FREE_MAP_SECTOR, bitmap_file_size (free_map)))
     PANIC ("free map creation failed");
@@ -150,7 +150,7 @@ free_map_create (void)
     PANIC ("can't write free map");
   //CHANGE// lock_release(&free_map_lock);
   //CHANGE//
-  lock_release(&free_map_lock);
+  //lock_release(&free_map_lock);
 #if free_map_debug
   debug("free_map_create exit\n");
 #endif
