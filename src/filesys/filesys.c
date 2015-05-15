@@ -101,8 +101,15 @@ filesys_open (const char *name)
   struct inode *inode = NULL;
   struct file *file = NULL;
 
+  // TODO: LOCK DIR
+
   if (dir != NULL)
-    dir_lookup (dir, name, &inode);
+    {
+      //dir_dir_lock(dir);
+      dir_lookup (dir, name, &inode);
+      //dir_dir_unlock(dir);
+    }
+
   dir_close (dir);
 
   file = file_open (inode);

@@ -6,7 +6,7 @@
 #include "filesys/inode.h"
 #include "threads/synch.h"
 
-#define free_map_debug 1
+#define free_map_debug 0
 
 static struct file *free_map_file;   /* Free map file. */
 static struct bitmap *free_map;      /* Free map, one bit per disk sector. */

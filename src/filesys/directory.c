@@ -7,7 +7,7 @@
 #include "threads/malloc.h"
 #include "threads/synch.h"
 
-#define dir_debug 1
+#define dir_debug 0
 
 /* A directory. */
 struct dir
@@ -167,10 +167,14 @@ dir_lookup (const struct dir *dir, const char *name,
 #endif
 
   //TODO: Add dir lock
+  //inode_dir_lock(dir->inode);
   if (lookup (dir, name, &e, NULL))
     *inode = inode_open (e.inode_sector);
   else
     *inode = NULL;
+
+  //inode_dir_unlock(dir->inode);
+
 
   //CHANGE//
 #if dir_debug
@@ -257,10 +261,11 @@ dir_remove (struct dir *dir, const char *name)
   ASSERT (name != NULL);
   //TODO -c: Add dir lock
   //CHANGE//
-   inode_dir_lock(dir->inode);
+  
 #if dir_debug
   debug("dir_remove enter\n");
 #endif
+   inode_dir_lock(dir->inode);
   /* Find directory entry. */
   if (!lookup (dir, name, &e, &ofs))
     goto done;
@@ -280,8 +285,8 @@ dir_remove (struct dir *dir, const char *name)
   success = true;
 
 done:
-   inode_dir_unlock(dir->inode);
   inode_close (inode);
+  inode_dir_unlock(dir->inode);
   //CHANGE//
 #if dir_debug
   debug("dir_remove exit\n");
@@ -301,7 +306,7 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 #if dir_debug
   debug("dir_readdir enter\n");
 #endif
-  inode_dir_lock(dir->inode);
+  //inode_dir_lock(dir->inode);
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e)
   {
     dir->pos += sizeof e;
@@ -309,7 +314,7 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
     {
       strlcpy (name, e.name, NAME_MAX + 1);
       //CHANGE//
-        inode_dir_unlock(dir->inode);
+      // inode_dir_unlock(dir->inode);
 #if dir_debug
       debug("dir_readdir exit\n");
 #endif
@@ -318,10 +323,39 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
     }
   }
   //CHANGE//
-     inode_dir_unlock(dir->inode);
+  //  inode_dir_unlock(dir->inode);
 #if dir_debug
   debug("dir_readdir exit\n");
 #endif
 
   return false;
 }
+
+void dir_dir_lock(struct dir * d)
+{
+#if inode_debug
+  debug("dir_dir_lock enter\n");
+#endif
+  if(d != NULL)
+    {
+      inode_dir_lock(d->inode);
+    }
+#if inode_debug
+  debug("dir_dir_lock exit\n");
+#endif
+}
+
+void dir_dir_unlock(struct dir * d)
+{
+#if inode_debug
+  debug("inode_dir_unlock enter\n");
+#endif
+  if(d != NULL)
+    {
+      inode_dir_unlock(d->inode);
+    }
+#if inode_debug
+  debug("inode_dir_init exit\n");
+#endif
+}
+
