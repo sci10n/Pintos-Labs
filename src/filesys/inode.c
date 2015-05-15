@@ -40,6 +40,12 @@ struct inode
   struct inode_disk data;             /* Inode content. */
   /*CHANGE*/ struct lock inode_lock;
   /*CHANGE*/ struct lock dir_lock;
+  /*CHANGE*/ struct condition write_cond;
+  /*CHANGE*/ struct condition read_cond;
+  /*CHANGE*/ struct lock write_lock;
+  /*CHANGE*/ struct lock read_lock;
+  /*CHANGE*/ int write_count;
+  /*CHANGE*/ int read_count;
 };
 
 
@@ -100,25 +106,25 @@ inode_create (disk_sector_t sector, off_t length)
 
   disk_inode = calloc (1, sizeof * disk_inode);
   if (disk_inode != NULL)
+  {
+    size_t sectors = bytes_to_sectors (length);
+    disk_inode->length = length;
+    disk_inode->magic = INODE_MAGIC;
+    if (free_map_allocate (sectors, &disk_inode->start))
     {
-      size_t sectors = bytes_to_sectors (length);
-      disk_inode->length = length;
-      disk_inode->magic = INODE_MAGIC;
-      if (free_map_allocate (sectors, &disk_inode->start))
-	{
-	  disk_write (filesys_disk, sector, disk_inode);
-	  if (sectors > 0)
-	    {
-	      static char zeros[DISK_SECTOR_SIZE];
-	      size_t i;
+      disk_write (filesys_disk, sector, disk_inode);
+      if (sectors > 0)
+      {
+        static char zeros[DISK_SECTOR_SIZE];
+        size_t i;
 
-	      for (i = 0; i < sectors; i++)
-		disk_write (filesys_disk, disk_inode->start + i, zeros);
-	    }
-	  success = true;
-	}
-      free (disk_inode);
+        for (i = 0; i < sectors; i++)
+          disk_write (filesys_disk, disk_inode->start + i, zeros);
+      }
+      success = true;
     }
+    free (disk_inode);
+  }
   /*CHANGE*/
 #if inode_debug
   debug("inode_create exit\n");
@@ -143,32 +149,32 @@ inode_open (disk_sector_t sector)
   /* Check whether this inode is already open. */
   for (e = list_begin (&open_inodes); e != list_end (&open_inodes);
        e = list_next (e))
-    {
-      inode = list_entry (e, struct inode, elem);
+  {
+    inode = list_entry (e, struct inode, elem);
 
-      if (inode->sector == sector)
-	{
-	  inode_reopen (inode);
-	  //lock_release(&(inode->dir_lock));
-	  lock_release(&inode_list_lock);
-#if inode_debug
-	  debug("inode_open exit\n");
-#endif
-	  return inode;
-	}
-    }
-  
-  /* Allocate memory. */
-  inode = malloc (sizeof * inode);
-  if (inode == NULL)
+    if (inode->sector == sector)
     {
-      /*CHANGE*/
+      inode_reopen (inode);
+      //lock_release(&(inode->dir_lock));
       lock_release(&inode_list_lock);
 #if inode_debug
       debug("inode_open exit\n");
 #endif
-      return NULL;
+      return inode;
     }
+  }
+
+  /* Allocate memory. */
+  inode = malloc (sizeof * inode);
+  if (inode == NULL)
+  {
+    /*CHANGE*/
+    lock_release(&inode_list_lock);
+#if inode_debug
+    debug("inode_open exit\n");
+#endif
+    return NULL;
+  }
 
   list_push_front (&open_inodes, &inode->elem);
   /* Initialize. */
@@ -178,7 +184,14 @@ inode_open (disk_sector_t sector)
 
   disk_read (filesys_disk, inode->sector, &inode->data);
   lock_init(&(inode->inode_lock));
+  lock_init(&(inode->write_lock));
+  lock_init(&(inode->read_lock));
+  cond_init(&(inode->write_cond));
+  cond_init(&(inode->read_cond));
+  inode->write_count = 0;
+  inode->read_count = 0;
   lock_release(&inode_list_lock);
+
   /*CHANGE*/
 #if inode_debug
   debug("inode_open exit\n");
@@ -195,11 +208,11 @@ inode_reopen (struct inode *inode)
   debug("inode_reopen enter\n");
 #endif
   if (inode != NULL)
-    {
-      lock_acquire(&(inode->inode_lock));
-      inode->open_cnt++;
-      lock_release(&(inode->inode_lock));
-    }
+  {
+    lock_acquire(&(inode->inode_lock));
+    inode->open_cnt++;
+    lock_release(&(inode->inode_lock));
+  }
   /*CHANGE*/
 #if inode_debug
   debug("inode_reopen exit\n");
@@ -234,43 +247,51 @@ inode_close (struct inode *inode)
 #endif
   /* Ignore null pointer. */
   if (inode == NULL)
-    {
-      /*CHANGE*/
+  {
+    /*CHANGE*/
 #if inode_debug
-      debug("inode_close exit\n");
+    debug("inode_close exit\n");
 #endif
-      return;
-    }
+    return;
+  }
 
   /*CHANGE*/ lock_acquire(&inode_list_lock);
+  if (!lock_held_by_current_thread(&(inode->write_lock)))
+    lock_acquire(&(inode->write_lock));
+  lock_release(&(inode->write_lock));
+  if (!lock_held_by_current_thread(&(inode->read_lock)))
+    lock_acquire(&(inode->read_lock));
+  lock_release(&(inode->read_lock));
+
   /*CHANGE*/ lock_acquire(&(inode->inode_lock));
+
   /* Release resources if this was the last opener. */
   if (--inode->open_cnt == 0)
+  {
+    /* Remove from inode list. */
+    list_remove (&inode->elem);
+
+    /* Deallocate blocks if the file is marked as removed. */
+    if (inode->removed)
     {
-      /* Remove from inode list. */
-      
-      list_remove (&inode->elem);
-      
-      /* Deallocate blocks if the file is marked as removed. */
-      if (inode->removed)
-	{
-	  //lock_release(&(inode->dir_lock));
-	  free_map_release (inode->sector, 1);
-	  free_map_release (inode->data.start,
-			    bytes_to_sectors (inode->data.length));
-	}
-      /*CHANGE*/
-      lock_release(&(inode->inode_lock));
-      free (inode);
-      /*CHANGE*/ lock_release(&inode_list_lock);
-      /*CHANGE*/
-#if inode_debug
-      debug("inode_close exit\n");
-#endif
-      return;
+      //lock_release(&(inode->dir_lock));
+      free_map_release (inode->sector, 1);
+      free_map_release (inode->data.start,
+                        bytes_to_sectors (inode->data.length));
     }
+    /*CHANGE*/
+
+    lock_release(&(inode->inode_lock));
+    free (inode);
+    /*CHANGE*/ lock_release(&inode_list_lock);
+    /*CHANGE*/
+#if inode_debug
+    debug("inode_close exit\n");
+#endif
+    return;
+  }
   /*CHANGE*/ lock_release(&(inode->inode_lock));
-     /*CHANGE*/ lock_release(&inode_list_lock);
+  /*CHANGE*/ lock_release(&inode_list_lock);
   /*CHANGE*/
 #if inode_debug
   debug("inode_close exit\n");
@@ -307,52 +328,105 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 #if inode_debug
   debug("inode_read_at enter\n");
 #endif
-
   /*CHANGE*/
-  lock_acquire(&(inode->inode_lock));
-  while (size > 0)
+  /*  lock_acquire(&(inode->rw_check_lock));
+    inode->read_count += 1;
+    if (inode->write_count > 0)
     {
-      /* Disk sector to read, starting byte offset within sector. */
-      disk_sector_t sector_idx = byte_to_sector (inode, offset);
-      int sector_ofs = offset % DISK_SECTOR_SIZE;
-
-      /* Bytes left in inode, bytes left in sector, lesser of the two. */
-      off_t inode_left = inode_length (inode) - offset;
-      int sector_left = DISK_SECTOR_SIZE - sector_ofs;
-      int min_left = inode_left < sector_left ? inode_left : sector_left;
-
-      /* Number of bytes to actually copy out of this sector. */
-      int chunk_size = size < min_left ? size : min_left;
-      if (chunk_size <= 0)
-	break;
-
-      if (sector_ofs == 0 && chunk_size == DISK_SECTOR_SIZE)
-	{
-	  /* Read full sector directly into caller's buffer. */
-	  disk_read (filesys_disk, sector_idx, buffer + bytes_read);
-	}
-      else
-	{
-	  /* Read sector into bounce buffer, then partially copy
-	     into caller's buffer. */
-	  if (bounce == NULL)
-	    {
-	      bounce = malloc (DISK_SECTOR_SIZE);
-	      if (bounce == NULL)
-		break;
-	    }
-	  disk_read (filesys_disk, sector_idx, bounce);
-	  memcpy (buffer + bytes_read, bounce + sector_ofs, chunk_size);
-	}
-
-      /* Advance. */
-      size -= chunk_size;
-      offset += chunk_size;
-      bytes_read += chunk_size;
+      debug("inside inode_read_at if write count = 0\n");
+      lock_release(&(inode->rw_check_lock));
+      lock_acquire(&(inode->read_lock));
+      debug("inside inode_read_at if write count = 1\n");
+      cond_wait(&(inode->read_cond), &(inode->read_lock));
+      lock_release(&(inode->read_lock));
+      debug("inside inode_read_at if write count = 2\n");
     }
+    else
+    {
+      debug("inside inode_read_at if write count != 0\n");
+      lock_release(&(inode->rw_check_lock));
+    }*/
+  lock_acquire(&(inode->inode_lock));
+  ++(inode->read_count);
+  if (inode->write_count != 0)
+  {
+    lock_release(&(inode->inode_lock));
+    lock_acquire(&(inode->read_lock));
+    cond_wait(&(inode->read_cond), &(inode->read_lock));
+    lock_release(&(inode->read_lock));
+  }
+  else
+  {
+    lock_release(&(inode->inode_lock));
+  }
+  while (size > 0)
+  {
+    /* Disk sector to read, starting byte offset within sector. */
+    disk_sector_t sector_idx = byte_to_sector (inode, offset);
+    int sector_ofs = offset % DISK_SECTOR_SIZE;
+
+    /* Bytes left in inode, bytes left in sector, lesser of the two. */
+    off_t inode_left = inode_length (inode) - offset;
+    int sector_left = DISK_SECTOR_SIZE - sector_ofs;
+    int min_left = inode_left < sector_left ? inode_left : sector_left;
+
+    /* Number of bytes to actually copy out of this sector. */
+    int chunk_size = size < min_left ? size : min_left;
+    if (chunk_size <= 0)
+      break;
+
+    if (sector_ofs == 0 && chunk_size == DISK_SECTOR_SIZE)
+    {
+      /* Read full sector directly into caller's buffer. */
+      disk_read (filesys_disk, sector_idx, buffer + bytes_read);
+    }
+    else
+    {
+      /* Read sector into bounce buffer, then partially copy
+         into caller's buffer. */
+      if (bounce == NULL)
+      {
+        bounce = malloc (DISK_SECTOR_SIZE);
+        if (bounce == NULL)
+          break;
+      }
+      disk_read (filesys_disk, sector_idx, bounce);
+      memcpy (buffer + bytes_read, bounce + sector_ofs, chunk_size);
+    }
+
+    /* Advance. */
+    size -= chunk_size;
+    offset += chunk_size;
+    bytes_read += chunk_size;
+  }
   free (bounce);
   /*CHANGE*/
+  lock_acquire(&(inode->inode_lock));
+  --(inode->read_count);
+  if (inode->read_count == 0)
+  {
+    lock_acquire(&(inode->write_lock));
+    cond_signal(&(inode->write_cond), &(inode->write_lock));
+    lock_release(&(inode->write_lock));
+  }
   lock_release(&(inode->inode_lock));
+  /*  lock_acquire(&(inode->rw_check_lock));
+    inode->read_count -= 1;
+    if (inode->read_count == 0)
+    {
+      debug("inside inode_read_at if read count = 0\n");
+      lock_release(&(inode->rw_check_lock));
+
+      lock_acquire(&(inode->write_lock));
+      cond_signal(&(inode->write_cond), &(inode->write_lock));
+      lock_release(&(inode->write_lock));
+    }
+    else
+    {
+      debug("inside inode_read_at if read count != 0\n");
+      lock_release(&(inode->rw_check_lock));
+    }*/
+
   /*CHANGE*/
 #if inode_debug
   debug("inode_read_at exit\n");
@@ -378,58 +452,119 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 #endif
 
   /*CHANGE*/
-  lock_acquire(&(inode->inode_lock));
-  while (size > 0)
+  /*  lock_acquire(&(inode->rw_check_lock));
+    inode->write_count += 1;
+    if (inode->write_count > 1 || inode->read_count > 0)
     {
-      /* Sector to write, starting byte offset within sector. */
-      disk_sector_t sector_idx = byte_to_sector (inode, offset);
-      int sector_ofs = offset % DISK_SECTOR_SIZE;
+      debug("Thread enter in wait write: %i, %i\n", inode->write_count, inode->read_count);
+      lock_release(&(inode->rw_check_lock));
+      lock_acquire(&(inode->write_lock));
 
-      /* Bytes left in inode, bytes left in sector, lesser of the two. */
-      off_t inode_left = inode_length (inode) - offset;
-      int sector_left = DISK_SECTOR_SIZE - sector_ofs;
-      int min_left = inode_left < sector_left ? inode_left : sector_left;
-
-      /* Number of bytes to actually write into this sector. */
-      int chunk_size = size < min_left ? size : min_left;
-      if (chunk_size <= 0)
-	break;
-
-      if (sector_ofs == 0 && chunk_size == DISK_SECTOR_SIZE)
-	{
-	  /* Write full sector directly to disk. */
-	  disk_write (filesys_disk, sector_idx, buffer + bytes_written);
-	}
-      else
-	{
-	  /* We need a bounce buffer. */
-	  if (bounce == NULL)
-	    {
-	      bounce = malloc (DISK_SECTOR_SIZE);
-	      if (bounce == NULL)
-		break;
-	    }
-
-	  /* If the sector contains data before or after the chunk
-	     we're writing, then we need to read in the sector
-	     first.  Otherwise we start with a sector of all zeros. */
-	  if (sector_ofs > 0 || chunk_size < sector_left)
-	    disk_read (filesys_disk, sector_idx, bounce);
-	  else
-	    memset (bounce, 0, DISK_SECTOR_SIZE);
-	  memcpy (bounce + sector_ofs, buffer + bytes_written, chunk_size);
-	  disk_write (filesys_disk, sector_idx, bounce);
-	}
-
-      /* Advance. */
-      size -= chunk_size;
-      offset += chunk_size;
-      bytes_written += chunk_size;
+      cond_wait(&(inode->write_cond), &(inode->write_lock));
     }
-  free (bounce);
+    else
+    {
+      lock_release(&(inode->rw_check_lock));
+      lock_acquire(&(inode->write_lock));
+    }*/
+  lock_acquire(&(inode->inode_lock));
+  ++(inode->write_count);
+  if (inode->write_count != 1 || inode->read_count != 0)
+  {
+    lock_release(&(inode->inode_lock));
+    lock_acquire(&(inode->write_lock));
+    cond_wait(&(inode->write_cond), &(inode->write_lock));
+  }
+  else
+  {
+    lock_acquire(&(inode->write_lock));
+    lock_release(&(inode->inode_lock));
+  }
+  lock_acquire(&(inode->read_lock));
 
-  /*CHANGE*/
+
+  while (size > 0)
+  {
+    /* Sector to write, starting byte offset within sector. */
+    disk_sector_t sector_idx = byte_to_sector (inode, offset);
+    int sector_ofs = offset % DISK_SECTOR_SIZE;
+
+    /* Bytes left in inode, bytes left in sector, lesser of the two. */
+    off_t inode_left = inode_length (inode) - offset;
+    int sector_left = DISK_SECTOR_SIZE - sector_ofs;
+    int min_left = inode_left < sector_left ? inode_left : sector_left;
+
+    /* Number of bytes to actually write into this sector. */
+    int chunk_size = size < min_left ? size : min_left;
+    if (chunk_size <= 0)
+      break;
+
+    if (sector_ofs == 0 && chunk_size == DISK_SECTOR_SIZE)
+    {
+      /* Write full sector directly to disk. */
+      disk_write (filesys_disk, sector_idx, buffer + bytes_written);
+    }
+    else
+    {
+      /* We need a bounce buffer. */
+      if (bounce == NULL)
+      {
+        bounce = malloc (DISK_SECTOR_SIZE);
+        if (bounce == NULL)
+          break;
+      }
+
+      /* If the sector contains data before or after the chunk
+         we're writing, then we need to read in the sector
+         first.  Otherwise we start with a sector of all zeros. */
+      if (sector_ofs > 0 || chunk_size < sector_left)
+        disk_read (filesys_disk, sector_idx, bounce);
+      else
+        memset (bounce, 0, DISK_SECTOR_SIZE);
+      memcpy (bounce + sector_ofs, buffer + bytes_written, chunk_size);
+      disk_write (filesys_disk, sector_idx, bounce);
+    }
+
+    /* Advance. */
+    size -= chunk_size;
+    offset += chunk_size;
+    bytes_written += chunk_size;
+  }
+  free (bounce);
+  lock_acquire(&(inode->inode_lock));
+  --(inode->write_count);
+  if (inode->write_count != 0)
+  {
+    cond_signal(&(inode->write_cond), &(inode->write_lock));
+  }
+  else
+  {
+    cond_broadcast(&(inode->read_cond), &(inode->read_lock));
+  }
+  lock_release(&(inode->read_lock));
+  lock_release(&(inode->write_lock));
   lock_release(&(inode->inode_lock));
+  /*  lock_acquire(&(inode->rw_check_lock));
+    inode->write_count -= 1;
+    if (inode->write_count > 0)
+    {
+      debug("Thread enter in signal write: %i\n", inode->write_count);
+      cond_signal(&(inode->write_cond), &(inode->write_lock));
+      lock_release(&(inode->write_lock));
+      lock_release(&(inode->rw_check_lock));
+    }
+    else
+    {
+    debug("Thread enter in broadcast write: %i\n", inode->write_count);
+      lock_release(&(inode->write_lock));
+      lock_release(&(inode->rw_check_lock));
+      lock_acquire(&(inode->read_lock));
+      cond_broadcast(&(inode->read_cond), &(inode->read_lock));
+      lock_release(&(inode->read_lock));
+       debug("Thread enter in broadcast write done: %i\n", inode->write_count);
+    }*/
+
+
 #if inode_debug
   debug("inode_write_at exit\n");
 #endif
