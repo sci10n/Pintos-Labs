@@ -46,7 +46,6 @@ dir_open (struct inode *inode)
   {
     dir->inode = inode;
     dir->pos = 0;
-    inode_dir_init(dir->inode);
     //CHANGE//
 #if dir_debug
     debug("dir_open exit\n");

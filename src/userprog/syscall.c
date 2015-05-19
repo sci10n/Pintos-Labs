@@ -45,16 +45,14 @@ static void
 syscall_handler (struct intr_frame *f)
 {
    int32_t* esp = (int32_t*)f->esp;
-   if (!pagedir_verify_pointer(esp) || !pagedir_verify_variable_length(esp))
+   if (!pagedir_verify_pointer(esp) || !pagedir_verify_fix_length(esp,4))  //check 4byte
    {
       process_exit(-1);
       thread_exit ();
    }
 
-   int sys_read_arg_count = argc[ esp[0] ];
-   int i = 1;
-   for (i = 1; i <= sys_read_arg_count; i++)
-      if (!pagedir_verify_pointer(esp + i) || !pagedir_verify_variable_length(esp + i))
+ int sys_read_arg_count = argc[ esp[0] ];
+      if (!pagedir_verify_pointer(esp+1) || !pagedir_verify_fix_length(esp+1 ,sys_read_arg_count*4))//check 4byte
       {
          process_exit(-1);
          thread_exit ();
@@ -85,7 +83,7 @@ syscall_handler (struct intr_frame *f)
       char *buffer = (char*)esp[2];
       int size = esp[3];
       //TODO: verrify pinter
-      if (size < 0 || !pagedir_verify_pointer(buffer) || !pagedir_verify_fix_length(buffer, size) || !pagedir_verify_pointer(buffer + size))
+      if (size < 0 ||!pagedir_verify_pointer(buffer)|| !pagedir_verify_fix_length(buffer, size)) //remove check pointer +size
       {
          process_exit(-1);
          thread_exit ();
@@ -128,7 +126,7 @@ syscall_handler (struct intr_frame *f)
       char * buffer = (char*) esp[2];
       int size = esp[3];
       //TODO: verrify pinter
-      if (!pagedir_verify_pointer(buffer) || !pagedir_verify_fix_length(buffer, size) || !pagedir_verify_pointer(buffer + size))
+      if (!pagedir_verify_fix_length(buffer, size) || !pagedir_verify_pointer(buffer))
       {
          process_exit(-1);
          thread_exit ();

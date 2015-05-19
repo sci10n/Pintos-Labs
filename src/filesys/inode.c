@@ -40,11 +40,8 @@ struct inode
   struct inode_disk data;             /* Inode content. */
   /*CHANGE*/ struct lock inode_lock;
   /*CHANGE*/ struct lock dir_lock;
-  /*CHANGE*/ struct condition write_cond;
-  /*CHANGE*/ struct condition read_cond;
   /*CHANGE*/ struct semaphore write_lock;
   /*CHANGE*/ struct semaphore read_lock;
-  /*CHANGE*/ int write_count;
   /*CHANGE*/ int read_count;
 };
 
@@ -186,9 +183,7 @@ inode_open (disk_sector_t sector)
   lock_init(&(inode->inode_lock));
   sema_init(&(inode->write_lock),1);
   sema_init(&(inode->read_lock),1);
-  cond_init(&(inode->write_cond));
-  cond_init(&(inode->read_cond));
-  inode->write_count = 0;
+  lock_init(&(inode->dir_lock));
   inode->read_count = 0;
   lock_release(&inode_list_lock);
 
@@ -320,21 +315,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 #if inode_debug
   debug("inode_read_at enter\n");
 #endif
-/*
-  lock_acquire(&(inode->inode_lock));
-  ++(inode->read_count);
-  if (inode->write_count != 0)
-  {
-    lock_release(&(inode->inode_lock));
-    lock_acquire(&(inode->read_lock));
-    cond_wait(&(inode->read_cond), &(inode->read_lock));
-    lock_release(&(inode->read_lock));
-  }
-  else
-  {
-    lock_release(&(inode->inode_lock));
-  }
-  */
+
   sema_down(&(inode->read_lock));
   lock_acquire(&(inode->inode_lock));
   inode->read_count += 1;
@@ -383,38 +364,12 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
     bytes_read += chunk_size;
   }
   free (bounce);
-  /*CHANGE*/
-  /*
-  lock_acquire(&(inode->inode_lock));
-  --(inode->read_count);
-  if (inode->read_count == 0)
-  {
-    lock_acquire(&(inode->write_lock));
-    cond_signal(&(inode->write_cond), &(inode->write_lock));
-    lock_release(&(inode->write_lock));
-  }
-  */
+
   lock_acquire(&(inode->inode_lock));
   inode->read_count -= 1;
   if(inode->read_count == 0)
     sema_up(&(inode->write_lock));
   lock_release(&(inode->inode_lock));
-  /*  lock_acquire(&(inode->rw_check_lock));
-    inode->read_count -= 1;
-    if (inode->read_count == 0)
-    {
-      debug("inside inode_read_at if read count = 0\n");
-      lock_release(&(inode->rw_check_lock));
-
-      lock_acquire(&(inode->write_lock));
-      cond_signal(&(inode->write_cond), &(inode->write_lock));
-      lock_release(&(inode->write_lock));
-    }
-    else
-    {
-      debug("inside inode_read_at if read count != 0\n");
-      lock_release(&(inode->rw_check_lock));
-    }*/
 
   /*CHANGE*/
 #if inode_debug
@@ -440,39 +395,6 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   debug("inode_write_at enter\n");
 #endif
 
-  /*CHANGE*/
-  /*  lock_acquire(&(inode->rw_check_lock));
-    inode->write_count += 1;
-    if (inode->write_count > 1 || inode->read_count > 0)
-    {
-      debug("Thread enter in wait write: %i, %i\n", inode->write_count, inode->read_count);
-      lock_release(&(inode->rw_check_lock));
-      lock_acquire(&(inode->write_lock));
-
-      cond_wait(&(inode->write_cond), &(inode->write_lock));
-    }
-    else
-    {
-      lock_release(&(inode->rw_check_lock));
-      lock_acquire(&(inode->write_lock));
-    }*/
-
-
-  /*
-  ++(inode->write_count);
-  if (inode->write_count != 1 || inode->read_count != 0)
-  {
-    lock_release(&(inode->inode_lock));
-    lock_acquire(&(inode->write_lock));
-    cond_wait(&(inode->write_cond), &(inode->write_lock));
-  }
-  else
-  {
-    lock_acquire(&(inode->write_lock));
-    lock_release(&(inode->inode_lock));
-  }
-  lock_acquire(&(inode->read_lock));
-*/
   sema_down(&(inode->read_lock));
   sema_down(&(inode->write_lock));
   while (size > 0)
@@ -525,20 +447,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   free (bounce);
   sema_up(&(inode->write_lock));
   sema_up(&(inode->read_lock));
-  /*
-  --(inode->write_count);
-  if (inode->write_count != 0)
-  {
-    cond_signal(&(inode->write_cond), &(inode->write_lock));
-  }
-  else
-  {
-    cond_broadcast(&(inode->read_cond), &(inode->read_lock));
-  }
-  lock_release(&(inode->read_lock));
-  lock_release(&(inode->write_lock));
-  lock_release(&(inode->inode_lock));
-  */
+
 #if inode_debug
   debug("inode_write_at exit\n");
 #endif
@@ -576,14 +485,3 @@ void inode_dir_unlock(struct inode * i)
 #endif
 }
 
-void inode_dir_init(struct inode * i)
-{
-#if inode_debug
-  debug("inode_dir_init enter\n");
-#endif
-  if (i != NULL)
-    lock_init(&(i->dir_lock));
-#if inode_debug
-  debug("inode_dir_init exit\n");
-#endif
-}
