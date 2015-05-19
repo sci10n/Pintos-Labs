@@ -330,32 +330,3 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 
   return false;
 }
-
-void dir_dir_lock(struct dir * d)
-{
-#if inode_debug
-  debug("dir_dir_lock enter\n");
-#endif
-  if(d != NULL)
-    {
-      inode_dir_lock(d->inode);
-    }
-#if inode_debug
-  debug("dir_dir_lock exit\n");
-#endif
-}
-
-void dir_dir_unlock(struct dir * d)
-{
-#if inode_debug
-  debug("inode_dir_unlock enter\n");
-#endif
-  if(d != NULL)
-    {
-      inode_dir_unlock(d->inode);
-    }
-#if inode_debug
-  debug("inode_dir_init exit\n");
-#endif
-}
-

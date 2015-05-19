@@ -29,7 +29,7 @@ struct process_list process_id_table;
  * the process subsystem. */
 void process_init(void)
 {
-   init_fatlock(&process_id_table);
+  init_fatlock(&process_id_table);
   //sema_init()
 }
 
@@ -38,9 +38,9 @@ void process_init(void)
  * instead. Note however that all cleanup after a process must be done
  * in process_cleanup, and that process_cleanup are already called
  * from thread_exit - do not call cleanup twice! */
-void process_exit(int status UNUSED)
+void process_exit(int status)
 {
-  plist_set_exit_status(&process_id_table, thread_current()->pid,status);
+  plist_set_exit_status(&process_id_table, thread_current()->pid, status);
 }
 
 /* Print a list of all running processes. The list shall include all
@@ -54,7 +54,7 @@ void process_print_list()
 struct parameters_to_start_process
 {
   char* command_line;
-  struct semaphore semaphore_process_id; 
+  struct semaphore semaphore_process_id;
   int process_id;
   int parent_id;
 };
@@ -69,7 +69,7 @@ start_process(struct parameters_to_start_process* parameters) NO_RETURN;
    Returns the new process's thread id, or TID_ERROR if the thread
    cannot be created. */
 int
-process_execute (const char *command_line) 
+process_execute (const char *command_line)
 {
   char debug_name[64];
   int command_line_size = strlen(command_line) + 1;
@@ -90,30 +90,30 @@ process_execute (const char *command_line)
 
 
   strlcpy_first_word (debug_name, command_line, 64);
-  
+
   sema_init(&(arguments.semaphore_process_id), 0);
   /* SCHEDULES function `start_process' to run (LATER) */
   thread_id = thread_create (debug_name, PRI_DEFAULT,
                              (thread_func*)start_process, &arguments);
-  if(thread_id == -1)
-    {
+  if (thread_id == -1)
+  {
     debug("Error in thread create\n");
     process_id = -1;
-    }  
+  }
   else
+  {
+    sema_down(&(arguments.semaphore_process_id));
+    process_id = arguments.process_id;
+    if (process_id != -1)
     {
-      sema_down(&(arguments.semaphore_process_id));
-      process_id =arguments.process_id;
-      if(process_id != -1)
-	{
-	  debug("Returned to process_execute with valid id\n");
-	  //Add to list
-	}
+      debug("Returned to process_execute with valid id\n");
+      //Add to list
     }
+  }
   /* AVOID bad stuff by turning off. YOU will fix this! */
   //power_off();
 
-  
+
   /* WHICH thread may still be using this right now? */
   // free(arguments.command_line);
 
@@ -137,12 +137,12 @@ start_process (struct parameters_to_start_process* parameters)
 
   char file_name[64];
   strlcpy_first_word (file_name, parameters->command_line, 64);
-  
+
   //debug("%s#%d: start_process(\"%s\") ENTERED\n",
   //      thread_current()->name,
-   //     thread_current()->tid,
-   //     parameters->command_line);
-  
+  //     thread_current()->tid,
+  //     parameters->command_line);
+
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -153,37 +153,41 @@ start_process (struct parameters_to_start_process* parameters)
 
   //debug("%s#%d: start_process(...): load returned %d\n",
   //      thread_current()->name,
-   //     thread_current()->tid,
-   //     success);
+  //     thread_current()->tid,
+  //     success);
   if (success)
+  {
+   // debug("ENTERED SUCCESS\n");
+    /* We managed to load the new program to a process, and have
+    allocated memory for a process stack. The stack top is in
+    if_.esp, now we must prepare and place the arguments to main on
+    the stack. */
+
+    plist_value_t value = plist_form_process_info(parameters->parent_id);
+    thread_current()->pid = plist_insert(&process_id_table, value );
+    if (thread_current()->pid == -1)
     {
-      /* We managed to load the new program to a process, and have
-	 allocated memory for a process stack. The stack top is in
-	 if_.esp, now we must prepare and place the arguments to main on
-	 the stack. */
+     // debug("ENTERED BAD PID\n");
+      success = false;
+    }
+    else
+    {
+      /* A temporary solution is to modify the stack pointer to
+         "pretend" the arguments are present on the stack. A normal
+         C-function expects the stack to contain, in order, the return
+         address, the first argument, the second argument etc. */
+      if_.esp = createStack(parameters->command_line, if_.esp);
+        //HACK if_.esp -= 12; /* Unacceptable solution. */
 
-      plist_value_t value = plist_form_process_info(parameters->parent_id);
-      thread_current()->pid = plist_insert(&process_id_table,value );
-      if(thread_current()->pid == -1)
-	   success = false;
-      else
-	{
-	  /* A temporary solution is to modify the stack pointer to
-	     "pretend" the arguments are present on the stack. A normal
-	     C-function expects the stack to contain, in order, the return
-	     address, the first argument, the second argument etc. */
-	  if_.esp = createStack(parameters->command_line, if_.esp);
-	  //HACK if_.esp -= 12; /* Unacceptable solution. */
+        /* The stack and stack pointer should be setup correct just before
+           the process start, so this is the place to dump stack content
+           for debug purposes. Disable the dump when it works. */
 
-	  /* The stack and stack pointer should be setup correct just before
-	     the process start, so this is the place to dump stack content
-	     for debug purposes. Disable the dump when it works. */
-    
-	  // dump_stack ( PHYS_BASE + 15, PHYS_BASE - if_.esp + 16 );
-    parameters->process_id = thread_current()->pid;
-    sema_up(&(parameters->semaphore_process_id));
-	}
-	 
+        // dump_stack ( PHYS_BASE + 15, PHYS_BASE - if_.esp + 16 );
+        parameters->process_id = thread_current()->pid;
+        sema_up(&(parameters->semaphore_process_id));
+    }
+
 
   }
   free(parameters->command_line);
@@ -199,12 +203,12 @@ start_process (struct parameters_to_start_process* parameters)
      - Not enough memory
   */
   if ( ! success )
-    {
-      debug("# problem with start process\n");
-      parameters->process_id = -1;
-      sema_up(&(parameters->semaphore_process_id));
-      thread_exit ();
-    }
+  {
+    debug("# problem with start process\n");
+    parameters->process_id = -1;
+    sema_up(&(parameters->semaphore_process_id));
+    thread_exit ();
+  }
   /* Start the user process by simulating a return from an interrupt,
      implemented by intr_exit (in threads/intr-stubs.S). Because
      intr_exit takes all of its arguments on the stack in the form of
@@ -224,23 +228,23 @@ start_process (struct parameters_to_start_process* parameters)
    This function will be implemented last, after a communication
    mechanism between parent and child is established. */
 int
-process_wait (int child_id) 
+process_wait (int child_id)
 {
 
   struct thread *cur = thread_current ();
   int status = -1;
   //debug("%s#%d: process_wait(%d) ENTERED\n",
-    //    cur->name, cur->pid, child_id);
+  //    cur->name, cur->pid, child_id);
   /* Yes! You need to do something good here ! */
-  if(plist_wait_for_pid(&process_id_table,child_id, cur->pid))
+  if (plist_wait_for_pid(&process_id_table, child_id, cur->pid))
   {
-    status = plist_get_exit_status(&process_id_table,child_id);
+    status = plist_get_exit_status(&process_id_table, child_id);
   }
-  
+
   //debug("%s#%d: process_wait(%d) RETURNS %d\n",
   //      cur->name, cur->pid, child_id, status);
-   return status;
- 
+  return status;
+
 }
 
 /* Free the current process's resources. This function is called
@@ -254,17 +258,17 @@ process_wait (int child_id)
    or initialized to something sane, or else that any such situation
    is detected.
 */
-  
+
 void
 process_cleanup (void)
 {
   struct thread  *cur = thread_current ();
   uint32_t       *pd  = cur->pagedir;
-  int status = plist_get_exit_status(&process_id_table,cur->pid);
+  int status = plist_get_exit_status(&process_id_table, cur->pid);
   //int status = plist_get_exit_status(&process_id_table,cur->tid);
-  
- // debug("%s#%i: process_cleanup() ENTERED\n", cur->name, cur->tid);
-  
+
+// debug("%s#%i: process_cleanup() ENTERED\n", cur->name, cur->tid);
+
   /* Later tests DEPEND on this output to work correct. You will have
    * to find the actual exit status in your process list. It is
    * important to do this printf BEFORE you tell the parent process
@@ -277,23 +281,23 @@ process_cleanup (void)
   plist_remove(&process_id_table, cur->pid);
   plist_clean(&process_id_table);
   // plist_print_list(&process_id_table);
-  
-  
-/* Destroy the current process's page directory and switch back
-     to the kernel-only page directory. */
-  if (pd != NULL) 
-    {
-      /* Correct ordering here is crucial.  We must set
-         cur->pagedir to NULL before switching page directories,
-         so that a timer interrupt can't switch back to the
-         process page directory.  We must activate the base page
-         directory before destroying the process's page
-         directory, or our active page directory will be one
-         that's been freed (and cleared). */
-      cur->pagedir = NULL;
-      pagedir_activate (NULL);
-      pagedir_destroy (pd);
-    }  
+
+
+  /* Destroy the current process's page directory and switch back
+       to the kernel-only page directory. */
+  if (pd != NULL)
+  {
+    /* Correct ordering here is crucial.  We must set
+       cur->pagedir to NULL before switching page directories,
+       so that a timer interrupt can't switch back to the
+       process page directory.  We must activate the base page
+       directory before destroying the process's page
+       directory, or our active page directory will be one
+       that's been freed (and cleared). */
+    cur->pagedir = NULL;
+    pagedir_activate (NULL);
+    pagedir_destroy (pd);
+  }
   //debug("%s#%i: process_cleanup() DONE with status %i\n",
   //      cur->name, cur->tid, status);
 }
@@ -319,6 +323,10 @@ void* createStack(const char * command_line, void* stack_top)
   /* Variable "esp" stores an address, and at the memory loaction
    * pointed out by that address a "struct main_args" is found.
    * That is: "esp" is a pointer to "struct main_args" */
+  //if (!pagedir_verify_pointer(stack_top))
+  //{
+  //  return NULL;
+  //}
   void* esp;
   int argc;
   int total_size;
@@ -330,56 +338,58 @@ void* createStack(const char * command_line, void* stack_top)
   char* cmd_line_on_stack;
   char* ptr_save;
   int i = 0;
-  
+
   /* calculate the bytes needed to store the command_line */
-  line_size = 1; 
+  line_size = 1;
   const char* c = command_line;
-  while(*(c++) != '\0')
-    {
-      line_size++;
-    }
+  while (*(c++) != '\0')
+  {
+    line_size++;
+  }
   /* round up to make it even divisible by 4 */
   line_size_nd = line_size;
-  line_size += line_size % 4 == 0 ? 0: 4 - line_size % 4;
+  line_size += line_size % 4 == 0 ? 0 : 4 - line_size % 4;
   /* calculate how many words the command_line contain */
   argc = 0;
   c = command_line;
   char prev = ' ';
-  while(*c != '\0')
-    {
-      
-      if(*c != ' ' && prev == ' ')
-   	argc++;
-      prev = *(c++);
-	
-    }
+  while (*c != '\0')
+  {
+
+    if (*c != ' ' && prev == ' ')
+      argc++;
+    prev = *(c++);
+
+  }
   /* calculate the size of each word */
   int argv_size[argc];
   int tmp = 0;
   c = command_line;
   i = 0;
-  while(i < argc)
+  while (i < argc)
+  {
+    if (*c == ' ' || *(c) == '\0')
     {
-      if(*c == ' ' || *(c) == '\0')
-	{
-	  if(tmp != 0)
-	    {
-	      argv_size[i++] = tmp;
-	      tmp = 0;
-	    }
-	}
-      else
-	tmp++;
-      c++;
+      if (tmp != 0)
+      {
+        argv_size[i++] = tmp;
+        tmp = 0;
+      }
     }
+    else
+      tmp++;
+    c++;
+  }
   /* calculate the size needed on our simulated stack */
-  total_size = line_size + argc*4 + 16;
+  total_size = line_size + argc * 4 + 16;
   /* calculate where the final stack top will be located */
-   esp =  stack_top - (total_size);
+  //if (!pagedir_verify_pointer(stack_top - (total_size)) || !pagedir_verify_fix_length(stack_top - total_size, total_size))
+  //  return NULL;
+  esp =  stack_top - (total_size);
   /* setup return address and argument count */
   //esp->ret = 0;
   //esp->argc = argc;
-  
+
   /* calculate where in the memory the words is stored */
   cmd_line_on_stack = stack_top - line_size;
 
@@ -387,38 +397,38 @@ void* createStack(const char * command_line, void* stack_top)
   //esp->argv = (cmd_line_on_stack - (argc+2)*4);
 
   /* copy the command_line to where it should be in the stack */
-  int*address_of_null[argc+1];
+  int*address_of_null[argc + 1];
   int temp_index = 1;
   address_of_null[0] = 0;
   int tmp_ptr = 0;
   prev = 0;
-  for(i = 0; i<= line_size; i++)
+  for (i = 0; i <= line_size; i++)
+  {
+    char ch = command_line[ (line_size - i)];
+    if (ch != ' ')
+      tmp_ptr = stack_top - i;
+    if ((ch == ' ') && ( line_size - i < line_size_nd))
     {
-      char ch = command_line[ (line_size - i)];
-      if(ch != ' ')
-	tmp_ptr = stack_top -i;
-      if((ch == ' ') && ( line_size - i < line_size_nd))
-	{
-	  ch = '\0';
-	  if(prev != '\0')
-	    address_of_null[temp_index++] = tmp_ptr;
-	}
-      (*(char*)(stack_top-i)) = ch; //might need to filter ' ' or '\0' or '.'
-      prev = ch;
+      ch = '\0';
+      if (prev != '\0')
+        address_of_null[temp_index++] = tmp_ptr;
     }
+    (*(char*)(stack_top - i)) = ch; //might need to filter ' ' or '\0' or '.'
+    prev = ch;
+  }
   address_of_null[argc] = tmp_ptr;
 
   /* build argv array and insert null-characters after each word */
-  for(i = 1; i<= argc+1; i++)
-    {
-      *(int*)(cmd_line_on_stack-i*4) = address_of_null[i-1];
-    }
+  for (i = 1; i <= argc + 1; i++)
+  {
+    *(int*)(cmd_line_on_stack - i * 4) = address_of_null[i - 1];
+  }
 
-  *(int*)(cmd_line_on_stack - (argc+2)*4) = cmd_line_on_stack - (argc+1)*4;
+  *(int*)(cmd_line_on_stack - (argc + 2) * 4) = cmd_line_on_stack - (argc + 1) * 4;
 
-  *(cmd_line_on_stack - (argc+3)*4) = argc;
+  *(cmd_line_on_stack - (argc + 3) * 4) = argc;
 
   //*(cmd_line_on_stack - (argc+4)*4) = esp->ret;
-  *(cmd_line_on_stack - (argc+4)*4) = 0;
+  *(cmd_line_on_stack - (argc + 4) * 4) = 0;
   return esp; /* the new stack top */
 }

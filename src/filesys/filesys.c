@@ -105,9 +105,7 @@ filesys_open (const char *name)
 
   if (dir != NULL)
     {
-      //dir_dir_lock(dir);
       dir_lookup (dir, name, &inode);
-      //dir_dir_unlock(dir);
     }
 
   dir_close (dir);
