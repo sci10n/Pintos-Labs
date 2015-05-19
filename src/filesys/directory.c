@@ -166,13 +166,13 @@ dir_lookup (const struct dir *dir, const char *name,
 #endif
 
   //TODO: Add dir lock
-  //inode_dir_lock(dir->inode);
+  inode_dir_lock(dir->inode);
   if (lookup (dir, name, &e, NULL))
     *inode = inode_open (e.inode_sector);
   else
     *inode = NULL;
 
-  //inode_dir_unlock(dir->inode);
+  inode_dir_unlock(dir->inode);
 
 
   //CHANGE//

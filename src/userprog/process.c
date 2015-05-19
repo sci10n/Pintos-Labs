@@ -115,7 +115,8 @@ process_execute (const char *command_line)
 
 
   /* WHICH thread may still be using this right now? */
-  // free(arguments.command_line);
+  
+  free(arguments.command_line);
 
   debug("%s#%d: process_execute(\"%s\") RETURNS %d\n",
         thread_current()->name,
@@ -190,7 +191,7 @@ start_process (struct parameters_to_start_process* parameters)
 
 
   }
-  free(parameters->command_line);
+  //free(parameters->command_line);
   //debug("%s#%d: start_process(\"%s\") DONE\n",
   //      thread_current()->name,
   //      thread_current()->tid,
